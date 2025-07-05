@@ -1,5 +1,11 @@
 App Review Analysis Tool (ReviewMetrix)
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/UtkuGlsvn/ReviewMetrix/main/img/ReviewMetrix.png" width="350" alt="ReviewMetrix Main Page">
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="https://raw.githubusercontent.com/UtkuGlsvn/ReviewMetrix/main/img/ReviewMetrixAnalys.png" width="350" alt="ReviewMetrix Analysis Page">
+</p>
+
 Description
 ReviewMetrix is a powerful web-based tool built with Flask that fetches and analyzes user reviews for any application from the Google Play Store and Apple App Store. It helps developers and product managers quickly identify common complaints and negative feedback by visualizing the most frequent keywords found in low-rated reviews.
 
