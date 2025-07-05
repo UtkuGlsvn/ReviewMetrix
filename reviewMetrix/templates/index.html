@@ -20,6 +20,22 @@
             margin: -5px 0 5px 0;
         }
         .full-width { grid-column: 1 / -1; }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ecf0f1;
+            font-size: 14px;
+            color: #95a5a6;
+        }
+    
+        .footer a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -61,7 +77,10 @@
                 <textarea id="extra_stopwords" name="extra_stopwords" rows="2">one,get,like,app,application</textarea>
             </div>
             <input type="submit" value="Start Analysis">
-        </form>
+        </form>        
+        <div class="footer">
+            <p>Developed by <a href="https://utkuglsvn.github.io/" target="_blank" rel="noopener noreferrer">utkuglsvn</a></p>
+        </div>
     </div>
 </body>
 </html>
