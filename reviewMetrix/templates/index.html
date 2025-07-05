@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Review Analysis Tool</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f4f7f9; color: #333; line-height: 1.6; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 20px auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; text-align: center; }
+        form { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .form-group { display: flex; flex-direction: column; }
+        label { font-weight: 600; margin-bottom: 5px; font-size: 14px; }
+        input[type="text"], input[type="number"] { padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+        input[type="submit"] { grid-column: 1 / -1; background-color: #3498db; color: white; padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 18px; font-weight: bold; transition: background-color 0.3s; }
+        input[type="submit"]:hover { background-color: #2980b9; }
+        .info-text {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin: -5px 0 5px 0;
+        }
+        .full-width { grid-column: 1 / -1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>App Review Analysis Tool</h1>
+        <!-- DÜZELTME: 'action' özniteliği doğru endpoint'e yönlendirildi -->
+        <form action="{{ url_for('main.analyze_reviews') }}" method="post">
+            <div class="form-group">
+                <label for="google_id">Google Play App ID</label>
+                <input type="text" id="google_id" name="google_id" value="com.instagram.android" required>
+            </div>
+            <div class="form-group">
+                <label for="apple_name">Apple Store App Name</label>
+                <input type="text" id="apple_name" name="apple_name" value="instagram" required>
+            </div>
+            <div class="form-group">
+                <label for="country">Store Country (e.g., us)</label>
+                <input type="text" id="country" name="country" value="us" required>
+            </div>
+            <div class="form-group">
+                <label for="language">Review Language (e.g., en)</label>
+                <input type="text" id="language" name="language" value="en" required>
+            </div>
+            <div class="form-group">
+                <label for="max_reviews">Number of Reviews to Fetch</label>
+                <input type="number" id="max_reviews" name="max_reviews" value="100" required>
+            </div>
+            <div class="form-group">
+                <label for="complaint_threshold">Complaint Score Threshold (&lt;=)</label>
+                <input type="number" id="complaint_threshold" name="complaint_threshold" value="2" min="1" max="5" required>
+            </div>
+            <div class="form-group full-width">
+                <label for="top_words">Number of Top Words to Display</label>
+                <input type="number" id="top_words" name="top_words" value="20" required>
+            </div>
+            <div class="form-group full-width">
+                <label for="extra_stopwords">Extra Stopwords (comma-separated)</label>
+                <p class="info-text">Words to exclude from the analysis. For a game app, you might add: game, level, coin</p>
+                <textarea id="extra_stopwords" name="extra_stopwords" rows="2">one,get,like,app,application</textarea>
+            </div>
+            <input type="submit" value="Start Analysis">
+        </form>
+    </div>
+</body>
+</html>

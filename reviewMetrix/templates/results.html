@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis Results</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f4f7f9; color: #333; line-height: 1.6; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: 20px auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1, h2 { color: #2c3e50; text-align: center; }
+        p { text-align: center; font-size: 18px; }
+        .results-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 30px; align-items: flex-start; margin-top: 30px; }
+        .word-list { list-style-type: none; padding: 0; }
+        .word-list li { background-color: #ecf0f1; margin-bottom: 8px; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; }
+        .word-list span { font-weight: bold; color: #3498db; }
+        img.wordcloud { max-width: 100%; height: auto; border-radius: 8px; }
+        .error { color: #e74c3c; font-weight: bold; }
+        a.back-button { display: inline-block; margin-top: 20px; padding: 10px 20px; background-color: #3498db; color: white; text-decoration: none; border-radius: 4px; transition: background-color 0.3s; }
+        a.back-button:hover { background-color: #2980b9; }
+        .center { text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Analysis Results</h1>
+        {% if error %}
+            <p class="error">{{ error }}</p>
+        {% else %}
+            <p>A total of <strong>{{ total_reviews }}</strong> reviews were fetched, and <strong>{{ complaint_count }}</strong> were analyzed as complaints.</p>
+            <div class="results-grid">
+                <div>
+                    <h2>Most Common Words</h2>
+                    <ol class="word-list">
+                        {% for word, count in most_common_words %}
+                        <li>{{ loop.index }}. {{ word }} <span>{{ count }}</span></li>
+                        {% endfor %}
+                    </ol>
+                </div>
+                <div>
+                    <h2>Complaint Word Cloud</h2>
+                    <img src="data:image/png;base64,{{ image_data }}" alt="Word Cloud" class="wordcloud">
+                </div>
+            </div>
+        {% endif %}
+        <div class="center">
+            <!-- CORRECTION: The 'href' attribute now points to the correct endpoint -->
+            <a href="{{ url_for('main.index') }}" class="back-button">Perform New Analysis</a>
+        </div>
+    </div>
+</body>
+</html>
