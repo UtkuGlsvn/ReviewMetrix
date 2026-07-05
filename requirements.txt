@@ -1,0 +1,8 @@
+Flask
+pandas
+nltk
+wordcloud
+matplotlib
+textblob
+google-play-scraper
+app-store-scraper

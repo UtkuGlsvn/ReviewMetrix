@@ -1,127 +1,603 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analysis Results</title>
+    <title>Analysis Results - ReviewMetrix</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f4f7f9; color: #333; line-height: 1.6; margin: 0; padding: 20px; }
-        .container { max-width: 900px; margin: 20px auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h1, h2 { color: #2c3e50; text-align: center; }
-        p { text-align: center; font-size: 18px; }
-        .results-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 30px; align-items: flex-start; margin-top: 30px; }
-        .word-list { list-style-type: none; padding: 0; }
-        .word-list li { background-color: #ecf0f1; margin-bottom: 8px; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; }
-        .word-list span { font-weight: bold; color: #3498db; }
-        img.wordcloud { max-width: 100%; height: auto; border-radius: 8px; }
-        .error { color: #e74c3c; font-weight: bold; }
-        a.back-button { display: inline-block; margin-top: 20px; padding: 10px 20px; background-color: #3498db; color: white; text-decoration: none; border-radius: 4px; transition: background-color 0.3s; }
-        a.back-button:hover { background-color: #2980b9; }
-        .center { text-align: center; }
-        .sentiment-card { background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 8px; margin-top: 20px; }
-        .sentiment-card h3 { margin-top: 0; text-align: center; color: #495057; }
-        .sentiment-bar { display: flex; height: 20px; border-radius: 4px; overflow: hidden; margin-bottom: 10px; }
-        .bar-positive { background-color: #28a745; }
-        .bar-neutral { background-color: #ffc107; }
-        .bar-negative { background-color: #dc3545; }
-        .sentiment-labels { display: flex; justify-content: space-between; font-size: 12px; }
-        .summary-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .summary-box { text-align: center; }
-        .summary-box p { margin: 5px 0; font-size: 14px; }
-        .summary-box .rating { font-size: 24px; font-weight: bold; color: #2c3e50; }
-        .footer {
-            text-align: center;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #ecf0f1;
-            font-size: 14px;
-            color: #95a5a6;
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(22, 28, 45, 0.4);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --accent-primary: #8b5cf6;
+            --accent-secondary: #ec4899;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --font-family: 'Plus Jakarta Sans', sans-serif;
+            --green: #10b981;
+            --red: #ef4444;
+            --yellow: #f59e0b;
         }
-    
-        .footer a {
-            color: #3498db;
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            background-image:
+                radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(236, 72, 153, 0.1) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        /* Topbar Header */
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 20px;
+        }
+
+        .logo {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #a78bfa 0%, #ec4899 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            padding: 10px 20px;
+            border-radius: 12px;
             text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        .footer a:hover {
-            text-decoration: underline;
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--accent-primary);
+            transform: translateX(-3px);
+        }
+
+        /* Error state */
+        .error-card {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            color: var(--red);
+            font-weight: 600;
+            margin: 40px 0;
+        }
+
+        /* Summary Cards Grid */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+        }
+
+        .stat-card::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 20px;
+            right: 20px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .stat-sub {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        /* Main Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .grid-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .grid-card h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .full-width-card {
+            grid-column: 1 / -1;
+        }
+
+        /* App Profile Details Styling */
+        .profile-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .profile-details p {
+            margin: 10px 0;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 10px;
+            display: flex;
+        }
+
+        .profile-details p strong {
+            color: var(--text-secondary);
+            flex: 0 0 110px;
+            /* Sabit genişlik etiketi hizalar */
+        }
+
+        .description-box {
+            margin-top: 20px;
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            font-style: italic;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        /* Word Cloud & Text Styling */
+        .wordcloud-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        img.wordcloud {
+            max-width: 100%;
+            height: auto;
+            border-radius: 12px;
+        }
+
+        /* Review List Table styling */
+        .reviews-table-wrapper {
+            overflow-x: auto;
+            margin-top: 15px;
+        }
+
+        .reviews-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .reviews-table th {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--card-border);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .reviews-table td {
+            padding: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            font-size: 0.95rem;
+            vertical-align: top;
+        }
+
+        .reviews-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .badge-positive {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--green);
+        }
+
+        .badge-neutral {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--yellow);
+        }
+
+        .badge-negative {
+            background: rgba(239, 104, 104, 0.15);
+            color: var(--red);
+        }
+
+        .stars-container {
+            color: var(--yellow);
+            letter-spacing: 2px;
+        }
+
+        @media (max-width: 1024px) {
+
+            .dashboard-grid,
+            .profile-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>Analysis Results</h1>
 
-             {% if summary_stats %}
-        <div class="summary-card">
-            <h3>Overall App Ratings</h3>
-            <div class="summary-container">
-                <div class="summary-box">
-                    <h4>Google Play</h4>
-                    {% if summary_stats.google %}
-                        <p class="rating">⭐ {{ "%.2f"|format(summary_stats.google.rating) }}</p>
-                        <p>{{ "{:,}".format(summary_stats.google.reviews) }} total reviews</p>
-                    {% else %}
-                        <p>Not available</p>
-                    {% endif %}
-                </div>
-                <div class="summary-box">
-                    <h4>Apple App Store</h4>
-                    {% if summary_stats.ios %}
-                        <p class="rating">⭐ {{ "%.2f"|format(summary_stats.ios.rating) }}</p>
-                        <p>{{ "{:,}".format(summary_stats.ios.reviews) }} total reviews</p>
-                    {% else %}
-                        <p>Not available</p>
-                    {% endif %}
-                </div>
-            </div>
+<body>
+    <div class="dashboard-container">
+        <div class="topbar">
+            <div class="logo">ReviewMetrix</div>
+            <a href="{{ url_for('main.index') }}" class="back-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Perform New Analysis
+            </a>
         </div>
-        {% endif %}
 
         {% if error %}
-            <p class="error">{{ error }}</p>
+        <div class="error-card">
+            <p style="font-size: 1.2rem; margin: 0;">⚠️ {{ error }}</p>
+        </div>
         {% else %}
-            <p>A total of <strong>{{ total_reviews }}</strong> reviews were fetched, and <strong>{{ complaint_count }}</strong> were analyzed as complaints.</p>
-                {% if sentiment_summary %}
-            <div class="sentiment-card">
-                <h3>Sentiment Analysis of Complaints</h3>
-                {% set total = sentiment_summary.positive + sentiment_summary.negative + sentiment_summary.neutral %}
-                {% if total > 0 %}
-                    <div class="sentiment-bar">
-                        <div class="bar-positive" style="width: {{ (sentiment_summary.positive / total) * 100 }}%;"></div>
-                        <div class="bar-neutral" style="width: {{ (sentiment_summary.neutral / total) * 100 }}%;"></div>
-                        <div class="bar-negative" style="width: {{ (sentiment_summary.negative / total) * 100 }}%;"></div>
-                    </div>
-                    <div class="sentiment-labels">
-                        <span>Positive: {{ sentiment_summary.positive }}</span>
-                        <span>Neutral: {{ sentiment_summary.neutral }}</span>
-                        <span>Negative: {{ sentiment_summary.negative }}</span>
-                    </div>
-                    <p style="font-size: 14px; margin-top: 10px;">Average Polarity: <strong>{{ "%.2f"|format(sentiment_summary.average_polarity) }}</strong></p>
+        <div class="summary-grid">
+            <div class="stat-card">
+                <span class="stat-label">Google Play Rating</span>
+                {% if summary_stats and summary_stats.google %}
+                <p class="stat-value" style="color: #60a5fa;">⭐ {{ "%.2f"|format(summary_stats.google.rating) }}</p>
+                <span class="stat-sub">{{ "{:,}".format(summary_stats.google.reviews) }} total store reviews</span>
+                {% else %}
+                <p class="stat-value" style="color: var(--text-secondary);">N/A</p>
+                <span class="stat-sub">Google app id not matched</span>
                 {% endif %}
             </div>
-            {% endif %}
-            <div class="results-grid">
-                <div>
-                    <h2>Most Common Words</h2>
-                    <ol class="word-list">
-                        {% for word, count in most_common_words %}
-                        <li>{{ loop.index }}. {{ word }} <span>{{ count }}</span></li>
-                        {% endfor %}
-                    </ol>
+            <div class="stat-card">
+                <span class="stat-label">App Store Rating</span>
+                {% if summary_stats and summary_stats.ios %}
+                <p class="stat-value" style="color: #f472b6;">⭐ {{ "%.2f"|format(summary_stats.ios.rating) }}</p>
+                <span class="stat-sub">{{ "{:,}".format(summary_stats.ios.reviews) }} total reviews</span>
+                {% else %}
+                <p class="stat-value" style="color: var(--text-secondary);">N/A</p>
+                <span class="stat-sub">iOS app name not found</span>
+                {% endif %}
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Reviews Scraped</span>
+                <p class="stat-value" style="color: var(--accent-primary);">{{ total_reviews }}</p>
+                <span class="stat-sub">Retrieved from App Store & Play Store</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Complaints Filtered</span>
+                <p class="stat-value" style="color: var(--accent-secondary);">{{ complaint_count }}</p>
+                <span class="stat-sub">Reviews with rating ≤ complaint threshold</span>
+            </div>
+        </div>
+
+        <div class="profile-grid">
+            {% if summary_stats and summary_stats.google %}
+            <div class="grid-card">
+                <h3 style="color: #60a5fa; margin-bottom: 15px;">🤖 Google Play Details</h3>
+                <div class="profile-details">
+                    <p><strong>App Name:</strong> <span>{{ summary_stats.google.title }}</span></p>
+                    <p><strong>Developer:</strong> <span>{{ summary_stats.google.developer }}</span></p>
+                    <p><strong>Category:</strong> <span>{{ summary_stats.google.category }}</span></p>
+                    <p><strong>Version:</strong> <span>{{ summary_stats.google.version }}</span></p>
+                    <p><strong>Released:</strong> <span>{{ summary_stats.google.released }}</span></p>
+                    <p><strong>Installs:</strong> <span>{{ summary_stats.google.installs }}</span></p>
+                    <div class="description-box">
+                        "{{ summary_stats.google.description }}"
+                    </div>
                 </div>
-                <div>
-                    <h2>Complaint Word Cloud</h2>
+            </div>
+            {% endif %}
+
+            {% if summary_stats and summary_stats.ios %}
+            <div class="grid-card">
+                <h3 style="color: #f472b6; margin-bottom: 15px;">🍎 App Store Details</h3>
+                <div class="profile-details">
+                    <p><strong>App Name:</strong> <span>{{ summary_stats.ios.title }}</span></p>
+                    <p><strong>Developer:</strong> <span>{{ summary_stats.ios.developer }}</span></p>
+                    <p><strong>Category:</strong> <span>{{ summary_stats.ios.category }}</span></p>
+                    <p><strong>Version:</strong> <span>{{ summary_stats.ios.version }}</span></p>
+                    <p><strong>Released:</strong> <span>{{ summary_stats.ios.released }}</span></p>
+                    <div class="description-box">
+                        "{{ summary_stats.ios.description }}"
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="grid-card">
+                <h3>Rating & Sentiment Trend Over Time</h3>
+                <div id="trendChart"></div>
+            </div>
+
+            <div class="grid-card">
+                <h3>Sentiment Analysis</h3>
+                <div id="sentimentChart"></div>
+                {% if sentiment_summary %}
+                <p style="font-size: 0.9rem; text-align: center; color: var(--text-secondary); margin-top: 15px;">
+                    Average Sentiment Polarity: <strong style="color: var(--accent-primary);">{{
+                        "%.2f"|format(sentiment_summary.average_polarity) }}</strong>
+                </p>
+                {% endif %}
+            </div>
+
+            <div class="grid-card">
+                <h3>Top Complaint Keywords</h3>
+                <div id="keywordChart"></div>
+            </div>
+
+            <div class="grid-card">
+                <h3>Complaint Word Cloud</h3>
+                <div class="wordcloud-container">
                     <img src="data:image/png;base64,{{ image_data }}" alt="Word Cloud" class="wordcloud">
                 </div>
             </div>
+
+            <div class="grid-card full-width-card">
+                <h3>Recent Filtered Complaints</h3>
+                <div class="reviews-table-wrapper">
+                    <table class="reviews-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 15%;">Score</th>
+                                <th style="width: 15%;">Sentiment</th>
+                                <th>Review Content</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if sample_reviews %}
+                            {% for rev in sample_reviews %}
+                            <tr>
+                                <td>
+                                    <span class="stars-container">
+                                        {% for i in range(rev.score) %}★{% endfor %}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if rev.sentiment > 0.05 %}
+                                    <span class="badge badge-positive">Positive ({{ rev.sentiment }})</span>
+                                    {% elif rev.sentiment < -0.05 %} <span class="badge badge-negative">Negative ({{
+                                        rev.sentiment }})</span>
+                                        {% else %}
+                                        <span class="badge badge-neutral">Neutral ({{ rev.sentiment }})</span>
+                                        {% endif %}
+                                </td>
+                                <td style="color: var(--text-primary); line-height: 1.5;">{{ rev.review }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% else %}
+                            <tr>
+                                <td colspan="3" style="text-align: center; color: var(--text-secondary);">No reviews to
+                                    display.</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
         {% endif %}
-        <div class="center">
-            <!-- CORRECTION: The 'href' attribute now points to the correct endpoint -->
-            <a href="{{ url_for('main.index') }}" class="back-button">Perform New Analysis</a>
-        </div>
     </div>
-    <div class="footer">
-            <p>Developed by <a href="https://utkuglsvn.github.io/" target="_blank" rel="noopener noreferrer">utkuglsvn</a></p>
-        </div>
+
+    {% if not error %}
+    <script>
+        // Set chart options globally for dark theme styling
+        const chartThemeOptions = {
+            theme: {
+                mode: 'dark'
+            },
+            chart: {
+                background: 'transparent',
+                foreColor: '#9ca3af',
+                fontFamily: 'Plus Jakarta Sans, sans-serif'
+            },
+            grid: {
+                borderColor: 'rgba(255, 255, 255, 0.05)'
+            }
+        };
+
+        // 1. Trend Line Chart (Time Series)
+        const trendRawData = {{ trend_data | tojson | safe }} || [];
+        const trendDates = trendRawData.map(item => item.date_str);
+        const trendAvgScores = trendRawData.map(item => item.avg_score);
+        const trendAvgSentiments = trendRawData.map(item => item.avg_sentiment);
+
+        const trendChartOptions = {
+            ...chartThemeOptions,
+            chart: {
+                ...chartThemeOptions.chart,
+                type: 'line',
+                height: 350,
+                toolbar: { show: false }
+            },
+            stroke: {
+                curve: 'smooth',
+                width: 3
+            },
+            colors: ['#a78bfa', '#f472b6'],
+            series: [{
+                name: 'Average Score',
+                data: trendAvgScores
+            }, {
+                name: 'Average Sentiment Polarity',
+                data: trendAvgSentiments
+            }],
+            xaxis: {
+                categories: trendDates,
+                type: 'datetime',
+                labels: {
+                    datetimeUTC: false
+                }
+            },
+            yaxis: {
+                labels: {
+                    formatter: function (val) {
+                        return val.toFixed(2);
+                    }
+                }
+            },
+            tooltip: {
+                x: { format: 'dd MMM yyyy' }
+            }
+        };
+        const trendChart = new ApexCharts(document.querySelector("#trendChart"), trendChartOptions);
+        trendChart.render();
+
+        // 2. Sentiment Donut Chart
+        {% if sentiment_summary %}
+        const sentimentChartOptions = {
+            ...chartThemeOptions,
+            chart: {
+                ...chartThemeOptions.chart,
+                type: 'donut',
+                height: 350
+            },
+            colors: ['#10b981', '#f59e0b', '#ef4444'],
+            labels: ['Positive', 'Neutral', 'Negative'],
+            series: [
+                {{ sentiment_summary.positive }},
+            {{ sentiment_summary.neutral }},
+        { { sentiment_summary.negative } }
+            ],
+        responsive: [{
+            breakpoint: 480,
+            options: {
+                chart: {
+                    width: 200
+                },
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }]
+        };
+        const sentimentChart = new ApexCharts(document.querySelector("#sentimentChart"), sentimentChartOptions);
+        sentimentChart.render();
+        {% endif %}
+
+        // 3. Keywords Horizontal Bar Chart
+        {% if most_common_words %}
+        const commonWords = {{ most_common_words | tojson | safe }};
+        const wordCategories = commonWords.map(item => item[0]);
+        const wordCounts = commonWords.map(item => item[1]);
+
+        const keywordChartOptions = {
+            ...chartThemeOptions,
+            chart: {
+                ...chartThemeOptions.chart,
+                type: 'bar',
+                height: 380,
+                toolbar: { show: false }
+            },
+            plotOptions: {
+                bar: {
+                    horizontal: true,
+                    borderRadius: 4,
+                    barHeight: '70%',
+                }
+            },
+            colors: ['#8b5cf6'],
+            series: [{
+                name: 'Word Count',
+                data: wordCounts
+            }],
+            xaxis: {
+                categories: wordCategories
+            }
+        };
+        const keywordChart = new ApexCharts(document.querySelector("#keywordChart"), keywordChartOptions);
+        keywordChart.render();
+        {% endif %}
+    </script>
+    {% endif %}
 </body>
+
 </html>

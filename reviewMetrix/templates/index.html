@@ -3,84 +3,330 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>App Review Analysis Tool</title>
+    <title>ReviewMetrix - App Intelligence Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f4f7f9; color: #333; line-height: 1.6; margin: 0; padding: 20px; }
-        .container { max-width: 800px; margin: 20px auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h1 { color: #2c3e50; text-align: center; }
-        form { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .form-group { display: flex; flex-direction: column; }
-        label { font-weight: 600; margin-bottom: 5px; font-size: 14px; }
-        input[type="text"], input[type="number"] { padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
-        input[type="submit"] { grid-column: 1 / -1; background-color: #3498db; color: white; padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 18px; font-weight: bold; transition: background-color 0.3s; }
-        input[type="submit"]:hover { background-color: #2980b9; }
-        .info-text {
-            font-size: 12px;
-            color: #7f8c8d;
-            margin: -5px 0 5px 0;
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(22, 28, 45, 0.4);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --accent-primary: #8b5cf6;
+            --accent-secondary: #ec4899;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --input-bg: rgba(17, 24, 39, 0.6);
+            --font-family: 'Plus Jakarta Sans', sans-serif;
         }
-        .full-width { grid-column: 1 / -1; }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.15) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+
+        .header-section {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.8rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #a78bfa 0%, #ec4899 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0 0 10px 0;
+            letter-spacing: -1px;
+            display: inline-block;
+        }
+
+        .tagline {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            font-weight: 400;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent-primary), var(--accent-secondary), transparent);
+        }
+
+        h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 30px;
+            color: var(--text-primary);
+        }
+
+        form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        input[type="text"], input[type="number"], textarea {
+            background-color: var(--input-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 14px 16px;
+            color: var(--text-primary);
+            font-family: var(--font-family);
+            font-size: 1rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            outline: none;
+        }
+
+        input[type="text"]:focus, input[type="number"]:focus, textarea:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+            background-color: rgba(17, 24, 39, 0.8);
+        }
+
+        textarea {
+            resize: vertical;
+        }
+
+        .info-text {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin: 6px 0 0 0;
+        }
+
+        .submit-btn {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, var(--accent-primary) 0%, #7c3aed 100%);
+            color: white;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+            background: linear-gradient(135deg, #9061f9 0%, #6d28d9 100%);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(11, 15, 25, 0.85);
+            backdrop-filter: blur(8px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 9999;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 5px solid rgba(139, 92, 246, 0.2);
+            border-top: 5px solid var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        .loading-text {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: 0.5px;
+            background: linear-gradient(135deg, #a78bfa 0%, #ec4899 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .loading-subtext {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-top: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         .footer {
             text-align: center;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #ecf0f1;
-            font-size: 14px;
-            color: #95a5a6;
+            margin-top: 40px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
         }
-    
+
         .footer a {
-            color: #3498db;
+            color: var(--accent-primary);
             text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
         }
+
         .footer a:hover {
-            text-decoration: underline;
+            color: var(--accent-secondary);
+        }
+
+        @media (max-width: 768px) {
+            form {
+                grid-template-columns: 1fr;
+            }
+            .card {
+                padding: 24px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>App Review Analysis Tool</h1>
-        <!-- DÜZELTME: 'action' özniteliği doğru endpoint'e yönlendirildi -->
-        <form action="{{ url_for('main.analyze_reviews') }}" method="post">
-            <div class="form-group">
-                <label for="google_id">Google Play App ID</label>
-                <input type="text" id="google_id" name="google_id" value="com.instagram.android" required>
-            </div>
-            <div class="form-group">
-                <label for="apple_name">Apple Store App Name</label>
-                <input type="text" id="apple_name" name="apple_name" value="instagram" required>
-            </div>
-            <div class="form-group">
-                <label for="country">Store Country (e.g., us)</label>
-                <input type="text" id="country" name="country" value="us" required>
-            </div>
-            <div class="form-group">
-                <label for="language">Review Language (e.g., en)</label>
-                <input type="text" id="language" name="language" value="en" required>
-            </div>
-            <div class="form-group">
-                <label for="max_reviews">Number of Reviews to Fetch</label>
-                <input type="number" id="max_reviews" name="max_reviews" value="100" required>
-            </div>
-            <div class="form-group">
-                <label for="complaint_threshold">Complaint Score Threshold (&lt;=)</label>
-                <input type="number" id="complaint_threshold" name="complaint_threshold" value="2" min="1" max="5" required>
-            </div>
-            <div class="form-group full-width">
-                <label for="top_words">Number of Top Words to Display</label>
-                <input type="number" id="top_words" name="top_words" value="20" required>
-            </div>
-            <div class="form-group full-width">
-                <label for="extra_stopwords">Extra Stopwords (comma-separated)</label>
-                <p class="info-text">Words to exclude from the analysis. For a game app, you might add: game, level, coin</p>
-                <textarea id="extra_stopwords" name="extra_stopwords" rows="2">one,get,like,app,application</textarea>
-            </div>
-            <input type="submit" value="Start Analysis">
-        </form>        
+        <div class="header-section">
+            <div class="logo">ReviewMetrix</div>
+            <div class="tagline">Dual-platform app review scraper, sentiment analyzer, and topic intelligence dashboard.</div>
+        </div>
+
+        <div class="card">
+            <h2>Initialize Review Analysis</h2>
+            <form action="{{ url_for('main.analyze_reviews') }}" method="post" onsubmit="showLoading()">
+                <div class="form-group">
+                    <label for="google_id">Google Play App ID</label>
+                    <input type="text" id="google_id" name="google_id" value="com.instagram.android" placeholder="e.g. com.instagram.android" required>
+                    <p class="info-text">Find in Play Store URL (id=...)</p>
+                </div>
+                <div class="form-group">
+                    <label for="apple_name">Apple Store App Name</label>
+                    <input type="text" id="apple_name" name="apple_name" value="instagram" placeholder="e.g. instagram" required>
+                    <p class="info-text">Name from App Store URL</p>
+                </div>
+                <div class="form-group">
+                    <label for="country">Store Country</label>
+                    <input type="text" id="country" name="country" value="us" placeholder="e.g. us" required>
+                </div>
+                <div class="form-group">
+                    <label for="language">Review Language</label>
+                    <input type="text" id="language" name="language" value="en" placeholder="e.g. en" required>
+                </div>
+                <div class="form-group">
+                    <label for="max_reviews">Number of Reviews to Fetch</label>
+                    <input type="number" id="max_reviews" name="max_reviews" value="100" min="10" max="1000" required>
+                </div>
+                <div class="form-group">
+                    <label for="complaint_threshold">Complaint Score Threshold (≤)</label>
+                    <input type="number" id="complaint_threshold" name="complaint_threshold" value="2" min="1" max="5" required>
+                    <p class="info-text">Analyze reviews with rating ≤ threshold</p>
+                </div>
+                <div class="form-group full-width">
+                    <label for="top_words">Number of Top Words to Display</label>
+                    <input type="number" id="top_words" name="top_words" value="20" required>
+                </div>
+                <div class="form-group full-width">
+                    <label for="extra_stopwords">Extra Stopwords (comma-separated)</label>
+                    <textarea id="extra_stopwords" name="extra_stopwords" rows="2">one,get,like,app,application</textarea>
+                    <p class="info-text">Words to ignore. (e.g. for game: game, level, play)</p>
+                </div>
+                <button type="submit" class="submit-btn">
+                    <span>Fetch & Analyze Reviews</span>
+                </button>
+            </form>        
+        </div>
+
         <div class="footer">
-            <p>Developed by <a href="https://utkuglsvn.github.io/" target="_blank" rel="noopener noreferrer">utkuglsvn</a></p>
+            <p>Powered by <a href="https://utkuglsvn.github.io/" target="_blank" rel="noopener noreferrer">ReviewMetrix Engine</a></p>
         </div>
     </div>
+
+    <!-- Loading Screen -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-text">Scraping Store Reviews...</div>
+        <div class="loading-subtext">Fetching data from App Store & Google Play. Please wait.</div>
+    </div>
+
+    <script>
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+    </script>
 </body>
 </html>

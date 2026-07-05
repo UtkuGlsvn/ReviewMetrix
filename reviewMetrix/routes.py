@@ -33,9 +33,9 @@ def analyze_reviews():
             all_reviews, complaint_threshold, apple_name, language, extra_stopwords_str
         )
         
-        most_common, image_data, sentiment_summary = None, None, None
+        most_common, image_data, sentiment_summary, trend_data, sample_reviews = None, None, None, None, None
         if complaints is not None and not complaints.empty:
-            most_common, image_data, sentiment_summary = analyzer.analyze_and_visualize(complaints, top_words)
+            most_common, image_data, sentiment_summary, trend_data, sample_reviews = analyzer.analyze_and_visualize(complaints, top_words)
         else:
             return render_template('results.html', 
                                    summary_stats=summary_stats,
@@ -49,7 +49,9 @@ def analyze_reviews():
             most_common_words=most_common,
             image_data=image_data,
             sentiment_summary=sentiment_summary,
-            summary_stats=summary_stats
+            summary_stats=summary_stats,
+            trend_data=trend_data,
+            sample_reviews=sample_reviews
         )
     except Exception as e:
         print(f"An error occurred: {e}")
