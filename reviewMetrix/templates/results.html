@@ -295,6 +295,171 @@
             letter-spacing: 2px;
         }
 
+        /* Sticky Section Navigation Menu */
+        .nav-menu {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 14px 0;
+            margin-bottom: 30px;
+            background: rgba(11, 15, 25, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .nav-menu a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 10px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .nav-menu a:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--card-border);
+        }
+
+        .nav-menu .export-btn {
+            margin-left: auto;
+            color: var(--accent-primary);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            background: rgba(139, 92, 246, 0.08);
+            cursor: pointer;
+            font-family: var(--font-family);
+        }
+
+        .nav-menu .export-btn:hover {
+            background: rgba(139, 92, 246, 0.18);
+            color: var(--text-primary);
+        }
+
+        /* Section anchor offset so sticky nav doesn't cover headings */
+        .section-anchor {
+            scroll-margin-top: 80px;
+        }
+
+        /* Platform Comparison */
+        .compare-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+        }
+
+        .compare-card {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 20px;
+        }
+
+        .compare-card h4 {
+            margin: 0 0 16px 0;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .compare-metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            font-size: 0.9rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .compare-metric:last-child {
+            border-bottom: none;
+        }
+
+        .compare-metric strong {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.1rem;
+        }
+
+        .platform-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .platform-tag.google {
+            background: rgba(96, 165, 250, 0.15);
+            color: #60a5fa;
+        }
+
+        .platform-tag.ios {
+            background: rgba(244, 114, 182, 0.15);
+            color: #f472b6;
+        }
+
+        /* Trending Complaints */
+        .trending-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 14px;
+        }
+
+        .trending-item {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--card-border);
+            border-left: 3px solid var(--accent-secondary);
+            border-radius: 12px;
+            padding: 14px 16px;
+        }
+
+        .trending-word {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .new-badge {
+            background: rgba(236, 72, 153, 0.15);
+            color: var(--accent-secondary);
+            font-size: 0.6rem;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 4px;
+            letter-spacing: 0.05em;
+        }
+
+        .trending-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .trending-change {
+            color: var(--green);
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .trending-detail {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+
         @media (max-width: 1024px) {
 
             .dashboard-grid,
@@ -324,6 +489,27 @@
             <p style="font-size: 1.2rem; margin: 0;">⚠️ {{ error }}</p>
         </div>
         {% else %}
+        <nav class="nav-menu">
+            <a href="#overview">Overview</a>
+            {% if platform_comparison %}<a href="#compare">Platforms</a>{% endif %}
+            {% if rating_distribution %}<a href="#distribution">Ratings</a>{% endif %}
+            {% if themes %}<a href="#themes">Themes</a>{% endif %}
+            {% if emerging_keywords and emerging_keywords.keywords %}<a href="#trending">Trending</a>{% endif %}
+            {% if version_breakdown %}<a href="#versions">Versions</a>{% endif %}
+            <a href="#trends">Trends</a>
+            <a href="#keywords">Keywords</a>
+            <a href="#reviews">Reviews</a>
+            {% if sample_reviews %}<button type="button" class="export-btn" onclick="exportReviewsCSV()">⬇ Export CSV</button>{% endif %}
+        </nav>
+
+        {% if date_range and (date_range.start or date_range.end) %}
+        <div style="margin-bottom: 20px; color: var(--text-secondary); font-size: 0.9rem;">
+            📅 <strong style="color: var(--accent-primary);">Date filter active:</strong>
+            {{ date_range.start or 'earliest' }} → {{ date_range.end or 'latest' }}
+        </div>
+        {% endif %}
+
+        <div id="overview" class="section-anchor"></div>
         <div class="summary-grid">
             <div class="stat-card">
                 <span class="stat-label">Google Play Rating</span>
@@ -392,6 +578,115 @@
             {% endif %}
         </div>
 
+        {% if platform_comparison %}
+        <div id="compare" class="section-anchor"></div>
+        <div class="grid-card full-width-card" style="margin-bottom: 30px;">
+            <h3>⚔️ Platform Comparison <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 400;">(based on scraped reviews)</span></h3>
+            <div class="compare-grid">
+                {% for p in platform_comparison %}
+                <div class="compare-card">
+                    <h4>
+                        {% if 'Google' in p.platform %}<span class="platform-tag google">Google Play</span>{% else %}<span class="platform-tag ios">App Store</span>{% endif %}
+                    </h4>
+                    <div class="compare-metric"><span>Reviews Scraped</span><strong>{{ p.count }}</strong></div>
+                    <div class="compare-metric"><span>Avg. Rating</span><strong style="color: var(--yellow);">⭐ {{ "%.2f"|format(p.avg_score) }}</strong></div>
+                    <div class="compare-metric"><span>Avg. Sentiment</span>
+                        <strong style="color: {% if p.avg_sentiment > 0.05 %}var(--green){% elif p.avg_sentiment < -0.05 %}var(--red){% else %}var(--yellow){% endif %};">{{ "%.2f"|format(p.avg_sentiment) }}</strong>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div id="distribution" class="section-anchor"></div>
+        <div class="dashboard-grid">
+            {% if rating_distribution %}
+            <div class="grid-card">
+                <h3>⭐ Rating Distribution</h3>
+                <div id="ratingDistChart"></div>
+            </div>
+            {% endif %}
+            {% if themes %}
+            <div id="themes" class="section-anchor"></div>
+            <div class="grid-card">
+                <h3>🏷️ Complaint Themes</h3>
+                <div id="themesChart"></div>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if emerging_keywords and emerging_keywords.keywords %}
+        <div id="trending" class="section-anchor"></div>
+        <div class="grid-card full-width-card" style="margin-bottom: 30px;">
+            <h3>📈 Trending Complaints
+                <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 400;">
+                    rising in the newer half ({{ emerging_keywords.recent_count }} recent vs {{ emerging_keywords.previous_count }} older complaints{% if emerging_keywords.split_date %}, split @ {{ emerging_keywords.split_date }}{% endif %})
+                </span>
+            </h3>
+            <div class="trending-grid">
+                {% for kw in emerging_keywords.keywords %}
+                <div class="trending-item">
+                    <div class="trending-word">
+                        {{ kw.word }}
+                        {% if kw.is_new %}<span class="new-badge">NEW</span>{% endif %}
+                    </div>
+                    <div class="trending-meta">
+                        <span class="trending-change">▲ +{{ kw.change }} pts</span>
+                        <span class="trending-detail">{{ kw.previous_pct }}% → {{ kw.recent_pct }}%</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if version_breakdown %}
+        <div id="versions" class="section-anchor"></div>
+        <div class="dashboard-grid">
+            <div class="grid-card">
+                <h3>📦 Complaints by App Version
+                    <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">Google Play only</span>
+                </h3>
+                <div id="versionChart"></div>
+            </div>
+            <div class="grid-card">
+                <h3>Version Health</h3>
+                <div class="reviews-table-wrapper">
+                    <table class="reviews-table">
+                        <thead>
+                            <tr>
+                                <th>Version</th>
+                                <th>Complaints</th>
+                                <th>Avg ⭐</th>
+                                <th>Sentiment</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for v in version_breakdown %}
+                            <tr>
+                                <td style="font-family: 'Outfit', sans-serif; font-weight: 600;">{{ v.version }}</td>
+                                <td><strong>{{ v.complaints }}</strong></td>
+                                <td style="color: var(--yellow);">{{ "%.2f"|format(v.avg_score) }}</td>
+                                <td>
+                                    {% if v.avg_sentiment > 0.05 %}
+                                    <span class="badge badge-positive">{{ v.avg_sentiment }}</span>
+                                    {% elif v.avg_sentiment < -0.05 %}
+                                    <span class="badge badge-negative">{{ v.avg_sentiment }}</span>
+                                    {% else %}
+                                    <span class="badge badge-neutral">{{ v.avg_sentiment }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div id="trends" class="section-anchor"></div>
         <div class="dashboard-grid">
             <div class="grid-card">
                 <h3>Rating & Sentiment Trend Over Time</h3>
@@ -409,6 +704,7 @@
                 {% endif %}
             </div>
 
+            <div id="keywords" class="section-anchor"></div>
             <div class="grid-card">
                 <h3>Top Complaint Keywords</h3>
                 <div id="keywordChart"></div>
@@ -421,13 +717,15 @@
                 </div>
             </div>
 
+            <div id="reviews" class="section-anchor"></div>
             <div class="grid-card full-width-card">
                 <h3>Recent Filtered Complaints</h3>
                 <div class="reviews-table-wrapper">
-                    <table class="reviews-table">
+                    <table class="reviews-table" id="reviewsTable">
                         <thead>
                             <tr>
-                                <th style="width: 15%;">Score</th>
+                                <th style="width: 12%;">Platform</th>
+                                <th style="width: 13%;">Score</th>
                                 <th style="width: 15%;">Sentiment</th>
                                 <th>Review Content</th>
                             </tr>
@@ -436,6 +734,11 @@
                             {% if sample_reviews %}
                             {% for rev in sample_reviews %}
                             <tr>
+                                <td>
+                                    {% if rev.platform == 'Google Play' %}<span class="platform-tag google">Play</span>
+                                    {% elif rev.platform == 'App Store' %}<span class="platform-tag ios">iOS</span>
+                                    {% else %}<span style="color: var(--text-secondary);">—</span>{% endif %}
+                                </td>
                                 <td>
                                     <span class="stars-container">
                                         {% for i in range(rev.score) %}★{% endfor %}
@@ -455,7 +758,7 @@
                             {% endfor %}
                             {% else %}
                             <tr>
-                                <td colspan="3" style="text-align: center; color: var(--text-secondary);">No reviews to
+                                <td colspan="4" style="text-align: center; color: var(--text-secondary);">No reviews to
                                     display.</td>
                             </tr>
                             {% endif %}
@@ -544,8 +847,8 @@
             labels: ['Positive', 'Neutral', 'Negative'],
             series: [
                 {{ sentiment_summary.positive }},
-            {{ sentiment_summary.neutral }},
-        { { sentiment_summary.negative } }
+                {{ sentiment_summary.neutral }},
+                {{ sentiment_summary.negative }}
             ],
         responsive: [{
             breakpoint: 480,
@@ -596,6 +899,110 @@
         const keywordChart = new ApexCharts(document.querySelector("#keywordChart"), keywordChartOptions);
         keywordChart.render();
         {% endif %}
+
+        // 4. Rating Distribution (stacked bar by platform, 1-5 stars)
+        {% if rating_distribution %}
+        const ratingDist = {{ rating_distribution | tojson | safe }};
+        const starLabels = ['1★', '2★', '3★', '4★', '5★'];
+        const distSeries = [];
+        const platformColors = { 'Google Play': '#60a5fa', 'App Store': '#f472b6' };
+        const byPlatform = ratingDist.by_platform || {};
+        if (Object.keys(byPlatform).length > 0) {
+            for (const [platform, counts] of Object.entries(byPlatform)) {
+                distSeries.push({
+                    name: platform,
+                    data: ['1', '2', '3', '4', '5'].map(s => counts[s] || 0)
+                });
+            }
+        } else {
+            const oc = ratingDist.overall || {};
+            distSeries.push({ name: 'Reviews', data: ['1', '2', '3', '4', '5'].map(s => oc[s] || 0) });
+        }
+
+        const ratingDistOptions = {
+            ...chartThemeOptions,
+            chart: { ...chartThemeOptions.chart, type: 'bar', height: 350, stacked: true, toolbar: { show: false } },
+            plotOptions: { bar: { borderRadius: 4, columnWidth: '55%' } },
+            colors: distSeries.map(s => platformColors[s.name] || '#8b5cf6'),
+            dataLabels: { enabled: false },
+            series: distSeries,
+            xaxis: { categories: starLabels },
+            legend: { position: 'top' }
+        };
+        new ApexCharts(document.querySelector("#ratingDistChart"), ratingDistOptions).render();
+        {% endif %}
+
+        // 5. Complaint Themes (horizontal bar)
+        {% if themes %}
+        const themesData = {{ themes | tojson | safe }};
+        const themesOptions = {
+            ...chartThemeOptions,
+            chart: { ...chartThemeOptions.chart, type: 'bar', height: 350, toolbar: { show: false } },
+            plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '65%', distributed: true } },
+            colors: ['#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#60a5fa', '#f472b6', '#a78bfa', '#ef4444', '#34d399', '#fbbf24'],
+            dataLabels: {
+                enabled: true,
+                formatter: (val, opt) => themesData[opt.dataPointIndex].percent + '%',
+                style: { colors: ['#f3f4f6'] }
+            },
+            legend: { show: false },
+            series: [{ name: 'Complaints', data: themesData.map(t => t.count) }],
+            xaxis: { categories: themesData.map(t => t.theme) },
+            tooltip: { y: { formatter: (val, opt) => val + ' complaints (' + themesData[opt.dataPointIndex].percent + '%)' } }
+        };
+        new ApexCharts(document.querySelector("#themesChart"), themesOptions).render();
+        {% endif %}
+
+        // 6. Complaints by App Version (column chart)
+        {% if version_breakdown %}
+        const versionData = {{ version_breakdown | tojson | safe }};
+        const versionOptions = {
+            ...chartThemeOptions,
+            chart: { ...chartThemeOptions.chart, type: 'bar', height: 350, toolbar: { show: false } },
+            plotOptions: { bar: { borderRadius: 4, columnWidth: '55%', distributed: true } },
+            dataLabels: { enabled: true },
+            colors: ['#8b5cf6', '#a78bfa', '#ec4899', '#f472b6', '#f59e0b', '#10b981', '#60a5fa', '#ef4444'],
+            legend: { show: false },
+            series: [{ name: 'Complaints', data: versionData.map(v => v.complaints) }],
+            xaxis: { categories: versionData.map(v => v.version) },
+            tooltip: {
+                y: {
+                    formatter: (val, opt) => {
+                        const v = versionData[opt.dataPointIndex];
+                        return val + ' complaints · avg ⭐' + v.avg_score + ' · sentiment ' + v.avg_sentiment;
+                    }
+                }
+            }
+        };
+        new ApexCharts(document.querySelector("#versionChart"), versionOptions).render();
+        {% endif %}
+
+        // CSV Export of the review table
+        {% if sample_reviews %}
+        const sampleReviews = {{ sample_reviews | tojson | safe }};
+        function exportReviewsCSV() {
+            const header = ['platform', 'score', 'sentiment', 'review'];
+            const escape = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+            const rows = sampleReviews.map(r => [r.platform || '', r.score, r.sentiment, r.review].map(escape).join(','));
+            const csv = [header.join(','), ...rows].join('\n');
+            const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'reviewmetrix_complaints.csv';
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+        window.exportReviewsCSV = exportReviewsCSV;
+        {% endif %}
+
+        // Smooth scrolling for the section nav
+        document.querySelectorAll('.nav-menu a[href^="#"]').forEach(a => {
+            a.addEventListener('click', e => {
+                e.preventDefault();
+                const target = document.querySelector(a.getAttribute('href'));
+                if (target) target.scrollIntoView({ behavior: 'smooth' });
+            });
+        });
     </script>
     {% endif %}
 </body>

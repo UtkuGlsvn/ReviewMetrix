@@ -126,7 +126,7 @@
             letter-spacing: 0.05em;
         }
 
-        input[type="text"], input[type="number"], textarea {
+        input[type="text"], input[type="number"], input[type="date"], textarea, select {
             background-color: var(--input-bg);
             border: 1px solid var(--card-border);
             border-radius: 12px;
@@ -138,7 +138,25 @@
             outline: none;
         }
 
-        input[type="text"]:focus, input[type="number"]:focus, textarea:focus {
+        select {
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+        }
+
+        select option {
+            background-color: #161c2d;
+            color: var(--text-primary);
+        }
+
+        input[type="date"] {
+            color-scheme: dark;
+        }
+
+        input[type="text"]:focus, input[type="number"]:focus, input[type="date"]:focus, textarea:focus, select:focus {
             border-color: var(--accent-primary);
             box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
             background-color: rgba(17, 24, 39, 0.8);
@@ -249,8 +267,67 @@
             color: var(--accent-secondary);
         }
 
+        /* Competitor / Compare section */
+        .competitor-section {
+            grid-column: 1 / -1;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 16px 20px;
+        }
+
+        .competitor-section summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            list-style: none;
+        }
+
+        .competitor-section summary span {
+            color: var(--text-secondary);
+            font-weight: 400;
+            font-size: 0.85rem;
+        }
+
+        .competitor-section summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .competitor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-top: 20px;
+        }
+
+        .button-row {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .button-row .submit-btn {
+            grid-column: auto;
+        }
+
+        .compare-btn {
+            background: linear-gradient(135deg, var(--accent-secondary) 0%, #db2777 100%);
+            box-shadow: 0 4px 12px rgba(219, 39, 119, 0.3);
+        }
+
+        .compare-btn:hover {
+            background: linear-gradient(135deg, #f472b6 0%, #be185d 100%);
+            box-shadow: 0 6px 20px rgba(219, 39, 119, 0.4);
+        }
+
         @media (max-width: 768px) {
             form {
+                grid-template-columns: 1fr;
+            }
+            .competitor-grid,
+            .button-row {
                 grid-template-columns: 1fr;
             }
             .card {
@@ -269,6 +346,22 @@
         <div class="card">
             <h2>Initialize Review Analysis</h2>
             <form action="{{ url_for('main.analyze_reviews') }}" method="post" onsubmit="showLoading()">
+                <div class="form-group full-width">
+                    <label for="app_preset">⚡ Quick Preset</label>
+                    <select id="app_preset" onchange="applyPreset(this.value)">
+                        <option value="">— Choose a popular app to auto-fill —</option>
+                        <option value="instagram">Instagram</option>
+                        <option value="tiktok">TikTok</option>
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="spotify">Spotify</option>
+                        <option value="youtube">YouTube</option>
+                        <option value="netflix">Netflix</option>
+                        <option value="facebook">Facebook</option>
+                        <option value="snapchat">Snapchat</option>
+                        <option value="twitter">X (Twitter)</option>
+                    </select>
+                    <p class="info-text">Auto-fills the Google Play ID and Apple Store name below.</p>
+                </div>
                 <div class="form-group">
                     <label for="google_id">Google Play App ID</label>
                     <input type="text" id="google_id" name="google_id" value="com.instagram.android" placeholder="e.g. com.instagram.android" required>
@@ -300,15 +393,46 @@
                     <label for="top_words">Number of Top Words to Display</label>
                     <input type="number" id="top_words" name="top_words" value="20" required>
                 </div>
+                <div class="form-group">
+                    <label for="start_date">From Date (optional)</label>
+                    <input type="date" id="start_date" name="start_date">
+                    <p class="info-text">Only analyze reviews on/after this date.</p>
+                </div>
+                <div class="form-group">
+                    <label for="end_date">To Date (optional)</label>
+                    <input type="date" id="end_date" name="end_date">
+                    <p class="info-text">Only analyze reviews on/before this date.</p>
+                </div>
                 <div class="form-group full-width">
                     <label for="extra_stopwords">Extra Stopwords (comma-separated)</label>
                     <textarea id="extra_stopwords" name="extra_stopwords" rows="2">one,get,like,app,application</textarea>
                     <p class="info-text">Words to ignore. (e.g. for game: game, level, play)</p>
                 </div>
-                <button type="submit" class="submit-btn">
-                    <span>Fetch & Analyze Reviews</span>
-                </button>
-            </form>        
+
+                <details class="competitor-section full-width">
+                    <summary>⚔️ Compare with a competitor <span>(optional — enables side-by-side comparison)</span></summary>
+                    <div class="competitor-grid">
+                        <div class="form-group">
+                            <label for="google_id_b">Competitor Google Play App ID</label>
+                            <input type="text" id="google_id_b" name="google_id_b" placeholder="e.g. com.zhiliaoapp.musically">
+                        </div>
+                        <div class="form-group">
+                            <label for="apple_name_b">Competitor Apple Store Name</label>
+                            <input type="text" id="apple_name_b" name="apple_name_b" placeholder="e.g. tiktok">
+                        </div>
+                    </div>
+                    <p class="info-text">Fill these in, then use the <strong>Compare Two Apps</strong> button below. Shared settings (country, language, review count, threshold) apply to both apps.</p>
+                </details>
+
+                <div class="button-row full-width">
+                    <button type="submit" class="submit-btn">
+                        <span>Fetch &amp; Analyze Reviews</span>
+                    </button>
+                    <button type="submit" class="submit-btn compare-btn" formaction="{{ url_for('main.compare_apps') }}">
+                        <span>⚔️ Compare Two Apps</span>
+                    </button>
+                </div>
+            </form>
         </div>
 
         <div class="footer">
@@ -324,6 +448,25 @@
     </div>
 
     <script>
+        const APP_PRESETS = {
+            instagram: { google: 'com.instagram.android', apple: 'instagram' },
+            tiktok:    { google: 'com.zhiliaoapp.musically', apple: 'tiktok' },
+            whatsapp:  { google: 'com.whatsapp', apple: 'whatsapp-messenger' },
+            spotify:   { google: 'com.spotify.music', apple: 'spotify-music' },
+            youtube:   { google: 'com.google.android.youtube', apple: 'youtube' },
+            netflix:   { google: 'com.netflix.mediaclient', apple: 'netflix' },
+            facebook:  { google: 'com.facebook.katana', apple: 'facebook' },
+            snapchat:  { google: 'com.snapchat.android', apple: 'snapchat' },
+            twitter:   { google: 'com.twitter.android', apple: 'twitter' },
+        };
+
+        function applyPreset(key) {
+            const preset = APP_PRESETS[key];
+            if (!preset) return;
+            document.getElementById('google_id').value = preset.google;
+            document.getElementById('apple_name').value = preset.apple;
+        }
+
         function showLoading() {
             document.getElementById('loadingOverlay').style.display = 'flex';
         }
