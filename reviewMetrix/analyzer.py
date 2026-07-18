@@ -56,7 +56,9 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
             'installs': gp_details.get('installs', 'Unknown'),
             'version': gp_details.get('version', 'Unknown'),
             'released': gp_details.get('released', 'Unknown'),
-            'description': gp_details.get('description', '')[:200] + '...' if gp_details.get('description') else 'No description'
+            'description': gp_details.get('description', '')[:200] + '...' if gp_details.get('description') else 'No description',
+            # ASO analizi tam metne ihtiyaç duyar; yukarıdaki kısaltılmış alan yalnızca gösterim içindir
+            'description_full': gp_details.get('description', '') or '',
         }
     except Exception as e:
         print(f"Google Play fetch error->: {e}")
@@ -79,7 +81,8 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
                 'category': app_data.get('primaryGenreName', 'Unknown'),
                 'version': app_data.get('version', 'Unknown'),
                 'released': app_data.get('releaseDate', 'Unknown')[:10] if app_data.get('releaseDate') else 'Unknown',
-                'description': app_data.get('description', '')[:200] + '...' if app_data.get('description') else 'No description'
+                'description': app_data.get('description', '')[:200] + '...' if app_data.get('description') else 'No description',
+                'description_full': app_data.get('description', '') or '',
             }
     except Exception as e:
         print(f"iTunes API Error ->: {e}")
@@ -689,6 +692,211 @@ def analyze_and_visualize(df, top_n, lang_code=None):
     }
 
 
+# ---------------------------------------------------------------------------
+# ASO (App Store Optimization)
+#
+# Mağaza listeleme metinlerini kullanıcıların gerçekte kullandığı dille
+# karşılaştırır. En değerli çıktı "keyword gap": kullanıcıların yorumlarda sık
+# kullandığı ama listelemede hiç geçmeyen kelimeler — doğrudan aksiyon alınabilir.
+# ---------------------------------------------------------------------------
+
+# Mağaza karakter limitleri (2024 itibarıyla)
+ASO_LIMITS = {
+    'google': {'title': 30, 'description': 4000},
+    'ios': {'title': 30, 'description': 4000},
+}
+
+# ASO açısından değersiz genel kelimeler. Yorum metinlerinde çok sık geçen ama
+# hiçbir arama niyeti taşımayan fiil/zarf/dolgu kelimeleri elenmezse keyword gap
+# listesi "getting, keeps, ever, thank" gibi gürültüyle dolar.
+ASO_GENERIC_WORDS = {
+    # genel
+    'app', 'apps', 'application', 'free', 'new', 'best', 'one', 'way', 'thing',
+    'things', 'stuff', 'lot', 'bit', 'kind', 'sort', 'part', 'time', 'times',
+    'day', 'days', 'week', 'weeks', 'month', 'months', 'year', 'years',
+    # fiiller ve çekimleri
+    'get', 'gets', 'getting', 'got', 'use', 'uses', 'using', 'used', 'make',
+    'makes', 'making', 'made', 'go', 'goes', 'going', 'went', 'do', 'does',
+    'doing', 'did', 'know', 'knows', 'think', 'thinks', 'say', 'says', 'said',
+    'see', 'sees', 'look', 'looks', 'come', 'comes', 'take', 'takes', 'give',
+    'gives', 'put', 'let', 'want', 'wants', 'need', 'needs', 'try', 'tries',
+    'trying', 'tell', 'feel', 'feels', 'keep', 'keeps', 'keeping', 'play',
+    'plays', 'playing', 'add', 'adds', 'added', 'thank', 'thanks', 'hope',
+    # sıfat/zarf dolguları
+    'like', 'just', 'also', 'can', 'will', 'really', 'much', 'many', 'good',
+    'great', 'please', 'even', 'every', 'always', 'never', 'still', 'back',
+    'since', 'without', 'everything', 'something', 'anything', 'nothing',
+    'someone', 'people', 'guys', 'ever', 'always', 'maybe', 'actually',
+    'pretty', 'quite', 'very', 'super', 'awesome', 'nice', 'amazing', 'love',
+    'hate', 'bad', 'worst', 'better', 'well', 'yet', 'though', 'however',
+}
+
+# Bigram'lar tek kelimelerden daha spesifik ASO sinyali taşır ("offline mode",
+# "sound quality"), bu yüzden sıralamada hafifçe öne çıkarılır.
+ASO_BIGRAM_BOOST = 1.6
+
+
+def _aso_tokens(text, lang_code='en'):
+    """Metni ASO analizi için anlamlı kelimelere ayırır."""
+    if not isinstance(text, str) or not text.strip():
+        return []
+    lang_map = {'en': 'english', 'tr': 'turkish', 'de': 'german',
+                'es': 'spanish', 'fr': 'french'}
+    try:
+        stop = set(stopwords.words(lang_map.get((lang_code or 'en').lower(), 'english')))
+    except Exception:
+        stop = set()
+    stop |= ASO_GENERIC_WORDS
+
+    words = re.sub(r'[^\w\s]', ' ', text.lower()).split()
+    return [w for w in words if len(w) >= 3 and not w.isdigit() and w not in stop]
+
+
+def _noun_filter(tokens, lang_code='en'):
+    """ASO anahtar kelimeleri ezici çoğunlukla isimdir ('offline', 'timer'),
+    fiil/sıfat değil ('would', 'love', 'broken'). İngilizce için POS etiketleme
+    ile isimleri süzer.
+
+    NLTK'nın etiketleyicisi yalnızca İngilizce çalışır; diğer dillerde veya
+    etiketleyici yoksa token'lar olduğu gibi döndürülür (stopword filtresi
+    yine de uygulanmış olur).
+    """
+    if (lang_code or 'en').lower() != 'en' or not tokens:
+        return tokens
+    try:
+        import nltk
+        return [word for word, tag in nltk.pos_tag(tokens) if tag.startswith('NN')]
+    except Exception:
+        return tokens  # etiketleyici yoksa sessizce eski davranışa dön
+
+
+def _metadata_health(store_key, stats):
+    """Bir mağaza için başlık/açıklama uzunluğu ve puan sağlığını değerlendirir."""
+    limits = ASO_LIMITS[store_key]
+    title = (stats.get('title') or '').strip()
+    description = stats.get('description_full') or ''
+    rating = stats.get('rating') or 0
+    review_count = stats.get('reviews') or 0
+
+    title_len = len(title)
+    desc_len = len(description)
+
+    def status(ok, warn):
+        return 'good' if ok else ('warn' if warn else 'bad')
+
+    return {
+        'store': 'Google Play' if store_key == 'google' else 'App Store',
+        'title': title,
+        'title_length': title_len,
+        'title_limit': limits['title'],
+        # Başlık limitin %70'inden kısaysa değerli keyword alanı boşta demektir
+        'title_status': status(title_len >= limits['title'] * 0.7, title_len > 0),
+        'description_length': desc_len,
+        'description_limit': limits['description'],
+        'description_status': status(desc_len >= limits['description'] * 0.5, desc_len > 500),
+        'rating': round(float(rating), 2),
+        'rating_status': status(rating >= 4.0, rating >= 3.5),
+        'reviews': int(review_count),
+        'reviews_status': status(review_count >= 1000, review_count >= 100),
+    }
+
+
+def get_aso_report(summary_stats, all_reviews, lang_code='en', top_n=15):
+    """Mağaza listelemesi ile kullanıcı dilini karşılaştıran ASO raporu üretir.
+
+    - metadata: başlık/açıklama uzunluğu, puan ve yorum sayısı sağlığı
+    - keyword_opportunities: yorumlarda sık geçen ama listelemede olmayan kelimeler
+    - listing_keywords: listelemenin hâlihazırda hedeflediği kelimeler
+    """
+    report = {
+        'metadata': [],
+        'keyword_opportunities': [],
+        'listing_keywords': [],
+        'reviews_analyzed': 0,
+        'available': False,
+    }
+
+    try:
+        stats = summary_stats or {}
+        # --- Metadata sağlığı ---
+        for key in ('google', 'ios'):
+            if stats.get(key):
+                report['metadata'].append(_metadata_health(key, stats[key]))
+
+        # --- Listeleme metnini topla ---
+        listing_parts = []
+        for key in ('google', 'ios'):
+            if stats.get(key):
+                listing_parts.append(stats[key].get('title') or '')
+                listing_parts.append(stats[key].get('description_full') or '')
+        listing_text = ' '.join(listing_parts).lower()
+
+        if listing_text.strip():
+            listing_tokens = _aso_tokens(listing_text, lang_code)
+            listing_counts = Counter(listing_tokens)
+            report['listing_keywords'] = [
+                {'term': term, 'count': int(count)}
+                for term, count in listing_counts.most_common(top_n)
+            ]
+
+        # --- Keyword gap: kullanıcı dili vs listeleme ---
+        if all_reviews is not None and not all_reviews.empty and 'review' in all_reviews.columns:
+            texts = all_reviews['review'].dropna().astype(str).tolist()
+            report['reviews_analyzed'] = len(texts)
+
+            listing_tokens_all = _aso_tokens(listing_text, lang_code)
+            listing_word_set = set(listing_tokens_all)
+            # Listelemede geçen ifadeleri de hariç tut
+            listing_phrase_set = {
+                f'{a} {b}' for a, b in zip(listing_tokens_all, listing_tokens_all[1:])
+            }
+            # Uygulama adını da hariç tut (kendi markası ASO fırsatı değil)
+            for key in ('google', 'ios'):
+                if stats.get(key):
+                    listing_word_set |= set(_aso_tokens(stats[key].get('title') or '', lang_code))
+
+            unigram_freq = Counter()
+            bigram_freq = Counter()
+            for text in texts:
+                tokens = _aso_tokens(text, lang_code)
+                nouns = set(_noun_filter(tokens, lang_code))
+                unigram_freq.update(nouns)
+                # İfadeler tam akıştan üretilir ki "sound quality" gibi sıfat+isim
+                # kalıpları kaybolmasın, ancak en az bir isim içermeleri gerekir —
+                # aksi halde "worse worse" gibi anlamsız ikililer listeye sızar.
+                bigram_freq.update({
+                    f'{a} {b}' for a, b in zip(tokens, tokens[1:])
+                    if a in nouns or b in nouns
+                })
+
+            candidates = []
+            for term, mentions in unigram_freq.items():
+                if term in listing_word_set or mentions < 2:
+                    continue
+                candidates.append((term, mentions, mentions, False))
+            for phrase, mentions in bigram_freq.items():
+                if phrase in listing_phrase_set or mentions < 2:
+                    continue
+                # Her iki kelimesi de listelemede geçen ifade yeni bilgi taşımaz
+                if all(w in listing_word_set for w in phrase.split()):
+                    continue
+                candidates.append((phrase, mentions, mentions * ASO_BIGRAM_BOOST, True))
+
+            candidates.sort(key=lambda c: c[2], reverse=True)
+            report['keyword_opportunities'] = [{
+                'term': term,
+                'mentions': int(mentions),
+                'percent': round(mentions * 100 / len(texts), 1),
+                'is_phrase': is_phrase,
+            } for term, mentions, _score, is_phrase in candidates[:top_n]]
+
+        report['available'] = bool(report['metadata'] or report['keyword_opportunities'])
+    except Exception as e:
+        print(f"Error building ASO report: {e}")
+
+    return report
+
+
 def build_app_report(google_id, apple_name, country, language, max_reviews,
                      complaint_threshold, top_words, extra_stopwords_str="",
                      start_date=None, end_date=None, force_refresh=False):
@@ -713,6 +921,8 @@ def build_app_report(google_id, apple_name, country, language, max_reviews,
         'version_breakdown': [],
         'sentiment_available': is_sentiment_supported(language),
         'lang_code': (language or 'en').lower(),
+        'aso': {'metadata': [], 'keyword_opportunities': [], 'listing_keywords': [],
+                'reviews_analyzed': 0, 'available': False},
         'error': None,
     }
 
@@ -741,6 +951,8 @@ def build_app_report(google_id, apple_name, country, language, max_reviews,
     report['total_reviews'] = int(len(all_reviews))
     report['rating_distribution'] = get_rating_distribution(all_reviews)
     report['platform_comparison'] = get_platform_comparison(all_reviews)
+    # ASO şikayet filtresinden bağımsız: tüm yorumların dilini kullanır
+    report['aso'] = get_aso_report(summary_stats, all_reviews, language)
 
     complaints = preprocess_and_filter_complaints(
         all_reviews, complaint_threshold, apple_name, language, extra_stopwords_str

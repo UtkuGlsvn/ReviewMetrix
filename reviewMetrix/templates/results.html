@@ -408,6 +408,142 @@
             color: #f472b6;
         }
 
+        /* ASO section */
+        .aso-meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 18px;
+            margin-bottom: 28px;
+        }
+
+        .aso-meta-card {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 18px;
+        }
+
+        .aso-meta-card h4 {
+            margin: 0 0 14px 0;
+        }
+
+        .aso-check {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 7px 0;
+            font-size: 0.88rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .aso-check:last-child {
+            border-bottom: none;
+        }
+
+        .aso-check span {
+            color: var(--text-secondary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .aso-check em {
+            font-style: normal;
+            color: var(--text-primary);
+        }
+
+        .aso-check strong {
+            font-family: 'Outfit', sans-serif;
+            white-space: nowrap;
+        }
+
+        .st-good {
+            color: var(--green);
+        }
+
+        .st-warn {
+            color: var(--yellow);
+        }
+
+        .st-bad {
+            color: var(--red);
+        }
+
+        .aso-keyword-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 28px;
+        }
+
+        .aso-col-head {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .aso-col-head em {
+            display: block;
+            font-style: normal;
+            font-weight: 400;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .aso-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .aso-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 14px;
+            border-radius: 9px;
+            margin-bottom: 5px;
+            background: rgba(0, 0, 0, 0.2);
+            font-size: 0.9rem;
+        }
+
+        .aso-count {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            color: var(--accent-primary);
+            white-space: nowrap;
+        }
+
+        .aso-count em {
+            font-style: normal;
+            font-weight: 400;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .phrase-badge {
+            background: rgba(236, 72, 153, 0.15);
+            color: var(--accent-secondary);
+            font-size: 0.6rem;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 4px;
+            letter-spacing: 0.05em;
+        }
+
+        .aso-empty {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        @media (max-width: 768px) {
+            .aso-keyword-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         /* Sentiment unavailable notice */
         .sentiment-notice {
             background: rgba(245, 158, 11, 0.08);
@@ -563,6 +699,7 @@
             {% if rating_distribution %}<a href="#distribution">Ratings</a>{% endif %}
             {% if themes %}<a href="#themes">Themes</a>{% endif %}
             {% if emerging_keywords and emerging_keywords.keywords %}<a href="#trending">Trending</a>{% endif %}
+            {% if aso and aso.available %}<a href="#aso">ASO</a>{% endif %}
             {% if version_breakdown %}<a href="#versions">Versions</a>{% endif %}
             <a href="#trends">Trends</a>
             <a href="#keywords">Keywords</a>
@@ -715,6 +852,77 @@
                     </div>
                 </div>
                 {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if aso and aso.available %}
+        <div id="aso" class="section-anchor"></div>
+        <div class="grid-card full-width-card" style="margin-bottom: 30px;">
+            <h3>🔍 ASO — Store Listing Optimization
+                <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">
+                    based on {{ aso.reviews_analyzed }} reviews vs. the store listing
+                </span>
+            </h3>
+
+            {% if aso.metadata %}
+            <div class="aso-meta-grid">
+                {% for m in aso.metadata %}
+                <div class="aso-meta-card">
+                    <h4>{% if m.store == 'Google Play' %}<span class="platform-tag google">Google Play</span>{% else %}<span class="platform-tag ios">App Store</span>{% endif %}</h4>
+                    <div class="aso-check">
+                        <span>Title <em>“{{ m.title }}”</em></span>
+                        <strong class="st-{{ m.title_status }}">{{ m.title_length }}/{{ m.title_limit }}</strong>
+                    </div>
+                    <div class="aso-check">
+                        <span>Description</span>
+                        <strong class="st-{{ m.description_status }}">{{ "{:,}".format(m.description_length) }}/{{ "{:,}".format(m.description_limit) }}</strong>
+                    </div>
+                    <div class="aso-check">
+                        <span>Rating</span>
+                        <strong class="st-{{ m.rating_status }}">⭐ {{ "%.2f"|format(m.rating) }}</strong>
+                    </div>
+                    <div class="aso-check">
+                        <span>Review volume</span>
+                        <strong class="st-{{ m.reviews_status }}">{{ "{:,}".format(m.reviews) }}</strong>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="aso-keyword-grid">
+                <div>
+                    <div class="aso-col-head">💡 Keyword opportunities
+                        <em>users say these — your listing doesn’t</em>
+                    </div>
+                    {% if aso.keyword_opportunities %}
+                    <ul class="aso-list">
+                        {% for k in aso.keyword_opportunities %}
+                        <li>
+                            <span>{{ k.term }}{% if k.is_phrase %} <span class="phrase-badge">PHRASE</span>{% endif %}</span>
+                            <span class="aso-count">{{ k.mentions }} <em>({{ k.percent }}%)</em></span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="aso-empty">No gaps found — the listing already covers the vocabulary users use.</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <div class="aso-col-head">🎯 Already targeted
+                        <em>top terms in your title &amp; description</em>
+                    </div>
+                    {% if aso.listing_keywords %}
+                    <ul class="aso-list">
+                        {% for k in aso.listing_keywords %}
+                        <li><span>{{ k.term }}</span><span class="aso-count">{{ k.count }}×</span></li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="aso-empty">No listing text available.</p>
+                    {% endif %}
+                </div>
             </div>
         </div>
         {% endif %}
