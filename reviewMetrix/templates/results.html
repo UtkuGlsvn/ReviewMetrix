@@ -408,6 +408,28 @@
             color: #f472b6;
         }
 
+        /* Sentiment unavailable notice */
+        .sentiment-notice {
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.25);
+            border-radius: 14px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+        }
+
+        .sentiment-notice strong {
+            display: block;
+            color: var(--yellow);
+            margin-bottom: 6px;
+            font-size: 0.95rem;
+        }
+
+        .sentiment-notice span {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
         /* Trending Complaints */
         .trending-grid {
             display: grid;
@@ -548,6 +570,15 @@
             {% if sample_reviews %}<button type="button" class="export-btn" onclick="exportReviewsCSV()">⬇ Export CSV</button>{% endif %}
             <button type="button" class="export-btn" onclick="window.print()">🖨️ Save as PDF</button>
         </nav>
+
+        {% if sentiment_available is defined and not sentiment_available %}
+        <div class="sentiment-notice">
+            <strong>⚠️ Sentiment analysis unavailable for "{{ lang_code }}"</strong>
+            <span>Supported languages: English, Turkish, German, Spanish, French. Sentiment sections are hidden
+                rather than shown as a misleading neutral 0.00. Ratings, themes, keywords and trends below are
+                unaffected.</span>
+        </div>
+        {% endif %}
 
         {% if date_range and (date_range.start or date_range.end) %}
         <div style="margin-bottom: 20px; color: var(--text-secondary); font-size: 0.9rem;">
@@ -706,7 +737,7 @@
                                 <th>Version</th>
                                 <th>Complaints</th>
                                 <th>Avg ⭐</th>
-                                <th>Sentiment</th>
+                                {% if sentiment_available is not defined or sentiment_available %}<th>Sentiment</th>{% endif %}
                             </tr>
                         </thead>
                         <tbody>
@@ -715,6 +746,7 @@
                                 <td style="font-family: 'Outfit', sans-serif; font-weight: 600;">{{ v.version }}</td>
                                 <td><strong>{{ v.complaints }}</strong></td>
                                 <td style="color: var(--yellow);">{{ "%.2f"|format(v.avg_score) }}</td>
+                                {% if sentiment_available is not defined or sentiment_available %}
                                 <td>
                                     {% if v.avg_sentiment > 0.05 %}
                                     <span class="badge badge-positive">{{ v.avg_sentiment }}</span>
@@ -724,6 +756,7 @@
                                     <span class="badge badge-neutral">{{ v.avg_sentiment }}</span>
                                     {% endif %}
                                 </td>
+                                {% endif %}
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -740,6 +773,7 @@
                 <div id="trendChart"></div>
             </div>
 
+            {% if sentiment_available is not defined or sentiment_available %}
             <div class="grid-card">
                 <h3>Sentiment Analysis</h3>
                 <div id="sentimentChart"></div>
@@ -750,6 +784,7 @@
                 </p>
                 {% endif %}
             </div>
+            {% endif %}
 
             <div id="keywords" class="section-anchor"></div>
             <div class="grid-card">
@@ -773,7 +808,7 @@
                             <tr>
                                 <th style="width: 12%;">Platform</th>
                                 <th style="width: 13%;">Score</th>
-                                <th style="width: 15%;">Sentiment</th>
+                                {% if sentiment_available is not defined or sentiment_available %}<th style="width: 15%;">Sentiment</th>{% endif %}
                                 <th>Review Content</th>
                             </tr>
                         </thead>
@@ -791,6 +826,7 @@
                                         {% for i in range(rev.score) %}★{% endfor %}
                                     </span>
                                 </td>
+                                {% if sentiment_available is not defined or sentiment_available %}
                                 <td>
                                     {% if rev.sentiment > 0.05 %}
                                     <span class="badge badge-positive">Positive ({{ rev.sentiment }})</span>
@@ -800,13 +836,14 @@
                                         <span class="badge badge-neutral">Neutral ({{ rev.sentiment }})</span>
                                         {% endif %}
                                 </td>
+                                {% endif %}
                                 <td style="color: var(--text-primary); line-height: 1.5;">{{ rev.review }}</td>
                             </tr>
                             {% endfor %}
                             {% else %}
                             <tr>
-                                <td colspan="4" style="text-align: center; color: var(--text-secondary);">No reviews to
-                                    display.</td>
+                                <td colspan="{% if sentiment_available is not defined or sentiment_available %}4{% else %}3{% endif %}"
+                                    style="text-align: center; color: var(--text-secondary);">No reviews to display.</td>
                             </tr>
                             {% endif %}
                         </tbody>
@@ -853,13 +890,14 @@
                 width: 3
             },
             colors: ['#a78bfa', '#f472b6'],
+            // Sentiment desteklenmeyen dillerde seriyi hiç ekleme (yanıltıcı düz çizgi olmasın)
             series: [{
                 name: 'Average Score',
                 data: trendAvgScores
-            }, {
+            }{% if sentiment_available is not defined or sentiment_available %}, {
                 name: 'Average Sentiment Polarity',
                 data: trendAvgSentiments
-            }],
+            }{% endif %}],
             xaxis: {
                 categories: trendDates,
                 type: 'datetime',
@@ -882,7 +920,7 @@
         trendChart.render();
 
         // 2. Sentiment Donut Chart
-        {% if sentiment_summary %}
+        {% if sentiment_summary and (sentiment_available is not defined or sentiment_available) %}
         const sentimentChartOptions = {
             ...chartThemeOptions,
             chart: {

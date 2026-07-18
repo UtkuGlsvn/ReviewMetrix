@@ -184,6 +184,71 @@ COMPLAINT_THEMES = {
     'Privacy & Ads Tracking': ['privacy', 'data', 'permission', 'tracking', 'security', 'hacked', 'scam'],
 }
 
+# Aynı temaların diğer dillerdeki karşılıkları. Analiz dili İngilizce dışındaysa
+# bu kelimeler İngilizce listeyle BİRLEŞTİRİLİR (yorumlar sık sık İngilizce
+# terim de içerdiği için ikisini birden aramak isabeti artırır).
+THEME_KEYWORDS_BY_LANG = {
+    'tr': {
+        'Crashes & Bugs': ['çöküyor', 'çökme', 'çöktü', 'kapanıyor', 'hata', 'donuyor', 'donma', 'açılmıyor', 'çalışmıyor', 'bozuk', 'kasıyor'],
+        'Performance': ['yavaş', 'ağır', 'gecikme', 'pil', 'batarya', 'ısınıyor', 'yükleniyor', 'geç'],
+        'Ads': ['reklam', 'reklamlar', 'reklamı'],
+        'Login & Account': ['giriş', 'oturum', 'hesap', 'şifre', 'doğrulama', 'banlandı', 'engellendi', 'kapatıldı'],
+        'Price & Payment': ['pahalı', 'ücret', 'abonelik', 'para', 'ödeme', 'iade', 'fiyat', 'satın'],
+        'UI & UX': ['arayüz', 'tasarım', 'karışık', 'kullanışsız', 'anlaşılmıyor', 'karmaşık'],
+        'Updates': ['güncelleme', 'güncellendi', 'güncellemeden', 'sürüm'],
+        'Notifications': ['bildirim', 'bildirimler'],
+        'Customer Support': ['destek', 'müşteri', 'yanıt', 'iletişim', 'dönüş'],
+        'Privacy & Ads Tracking': ['gizlilik', 'veri', 'izin', 'güvenlik', 'dolandırıcı'],
+    },
+    'de': {
+        'Crashes & Bugs': ['absturz', 'stürzt', 'abstürze', 'fehler', 'hängt', 'kaputt', 'defekt', 'friert'],
+        'Performance': ['langsam', 'träge', 'akku', 'batterie', 'heiß', 'ladezeit', 'lädt'],
+        'Ads': ['werbung', 'anzeigen', 'werbe'],
+        'Login & Account': ['anmelden', 'anmeldung', 'einloggen', 'konto', 'passwort', 'gesperrt'],
+        'Price & Payment': ['teuer', 'preis', 'abo', 'abonnement', 'geld', 'zahlung', 'erstattung', 'kosten'],
+        'UI & UX': ['oberfläche', 'design', 'unübersichtlich', 'kompliziert', 'verwirrend'],
+        'Updates': ['update', 'aktualisierung', 'version'],
+        'Notifications': ['benachrichtigung', 'benachrichtigungen', 'mitteilungen'],
+        'Customer Support': ['support', 'kundendienst', 'antwort', 'kontakt'],
+        'Privacy & Ads Tracking': ['datenschutz', 'daten', 'berechtigung', 'sicherheit', 'betrug'],
+    },
+    'es': {
+        'Crashes & Bugs': ['falla', 'fallo', 'cierra', 'error', 'cuelga', 'bloquea', 'no funciona'],
+        'Performance': ['lento', 'lenta', 'batería', 'calienta', 'carga', 'tarda'],
+        'Ads': ['anuncios', 'publicidad', 'anuncio'],
+        'Login & Account': ['iniciar', 'sesión', 'cuenta', 'contraseña', 'bloqueado', 'verificación'],
+        'Price & Payment': ['caro', 'precio', 'suscripción', 'dinero', 'pago', 'reembolso', 'cobro'],
+        'UI & UX': ['interfaz', 'diseño', 'confuso', 'complicado'],
+        'Updates': ['actualización', 'actualizar', 'versión'],
+        'Notifications': ['notificación', 'notificaciones'],
+        'Customer Support': ['soporte', 'atención', 'respuesta', 'contacto'],
+        'Privacy & Ads Tracking': ['privacidad', 'datos', 'permiso', 'seguridad', 'estafa'],
+    },
+    'fr': {
+        'Crashes & Bugs': ['plante', 'plantage', 'bug', 'erreur', 'ferme', 'bloque', 'ne fonctionne pas'],
+        'Performance': ['lent', 'lente', 'lenteur', 'batterie', 'chauffe', 'charge'],
+        'Ads': ['publicité', 'publicités', 'pubs', 'pub'],
+        'Login & Account': ['connexion', 'connecter', 'compte', 'mot de passe', 'bloqué', 'vérification'],
+        'Price & Payment': ['cher', 'chère', 'prix', 'abonnement', 'argent', 'paiement', 'remboursement'],
+        'UI & UX': ['interface', 'design', 'confus', 'compliqué'],
+        'Updates': ['mise à jour', 'version', 'mise'],
+        'Notifications': ['notification', 'notifications'],
+        'Customer Support': ['support', 'service client', 'réponse', 'contact'],
+        'Privacy & Ads Tracking': ['confidentialité', 'données', 'autorisation', 'sécurité', 'arnaque'],
+    },
+}
+
+
+def get_theme_keywords(lang_code='en'):
+    """Verilen dil için tema->anahtar kelime haritasını döndürür.
+    İngilizce dışındaki diller için İngilizce liste ile birleştirilir."""
+    base = {theme: list(words) for theme, words in COMPLAINT_THEMES.items()}
+    extra = THEME_KEYWORDS_BY_LANG.get((lang_code or 'en').lower())
+    if extra:
+        for theme, words in extra.items():
+            base.setdefault(theme, []).extend(words)
+    return base
+
 
 def get_rating_distribution(df):
     """Çekilen TÜM yorumların yıldız (1-5) dağılımını hem toplam
@@ -211,17 +276,19 @@ def get_rating_distribution(df):
     return result
 
 
-def categorize_complaints(df):
+def categorize_complaints(df, lang_code='en'):
     """Şikayet yorumlarını anahtar kelime eşleştirmesiyle temalara ayırır.
-    Bir yorum birden fazla temaya sayılabilir. En sık temalardan başlayarak sıralı liste döndürür."""
+    Bir yorum birden fazla temaya sayılabilir. En sık temalardan başlayarak sıralı liste döndürür.
+    lang_code verilirse o dilin anahtar kelimeleri de aramaya dahil edilir."""
     themes = []
     if df is None or df.empty or 'review' not in df.columns:
         return themes
     try:
-        counts = {theme: 0 for theme in COMPLAINT_THEMES}
+        theme_keywords = get_theme_keywords(lang_code)
+        counts = {theme: 0 for theme in theme_keywords}
         texts = df['review'].dropna().astype(str).str.lower().tolist()
         for text in texts:
-            for theme, keywords in COMPLAINT_THEMES.items():
+            for theme, keywords in theme_keywords.items():
                 if any(kw in text for kw in keywords):
                     counts[theme] += 1
         total = len(texts) or 1
@@ -386,12 +453,121 @@ def get_version_breakdown(df, top_n=8):
     return result
 
 
-def get_sentiment(text):
+# ---------------------------------------------------------------------------
+# Çok dilli sentiment
+#
+# TextBlob yalnızca İngilizce çalışır; diğer dillerde her yoruma 0.0 (nötr)
+# döndürür ki bu sessizce yanlıştır. Aşağıdaki sözlükler uygulama yorumlarında
+# sık geçen açıkça olumlu/olumsuz kelimeleri kapsar. Desteklenmeyen dillerde
+# sentiment hesaplanmaz ve arayüz bunu açıkça belirtir.
+# ---------------------------------------------------------------------------
+
+SENTIMENT_LEXICONS = {
+    'tr': {
+        # olumsuz
+        'berbat': -1.0, 'rezalet': -1.0, 'korkunç': -1.0, 'iğrenç': -1.0, 'felaket': -1.0,
+        'kötü': -0.7, 'saçma': -0.7, 'bozuk': -0.7, 'yavaş': -0.6, 'donuyor': -0.7,
+        'çöküyor': -0.8, 'çöktü': -0.8, 'kasıyor': -0.6, 'hatalı': -0.6, 'sorunlu': -0.6,
+        'çalışmıyor': -0.8, 'açılmıyor': -0.8, 'pahalı': -0.5, 'gereksiz': -0.5,
+        'dolandırıcı': -1.0, 'vasat': -0.4, 'yetersiz': -0.5, 'sinir': -0.7, 'nefret': -0.9,
+        # olumlu
+        'harika': 1.0, 'mükemmel': 1.0, 'muhteşem': 1.0, 'süper': 0.8, 'güzel': 0.6,
+        'başarılı': 0.7, 'hızlı': 0.6, 'kolay': 0.5, 'faydalı': 0.6, 'bayıldım': 0.9,
+        'sevdim': 0.8, 'memnun': 0.7, 'teşekkür': 0.5, 'iyi': 0.5,
+    },
+    'de': {
+        'schrecklich': -1.0, 'furchtbar': -1.0, 'katastrophe': -1.0, 'katastrophal': -1.0,
+        'schlecht': -0.7, 'mies': -0.8, 'langsam': -0.6, 'absturz': -0.8, 'stürzt': -0.8,
+        'fehler': -0.5, 'nervig': -0.7, 'ärgerlich': -0.7, 'unbrauchbar': -0.9,
+        'teuer': -0.5, 'betrug': -1.0, 'nutzlos': -0.8, 'enttäuscht': -0.7, 'hasse': -0.9,
+        'super': 0.8, 'toll': 0.8, 'großartig': 1.0, 'ausgezeichnet': 1.0, 'perfekt': 1.0,
+        'gut': 0.5, 'schnell': 0.6, 'einfach': 0.4, 'hilfreich': 0.6, 'liebe': 0.8,
+        'empfehlenswert': 0.7, 'zufrieden': 0.7,
+    },
+    'es': {
+        'terrible': -1.0, 'horrible': -1.0, 'pésimo': -1.0, 'basura': -0.9,
+        'malo': -0.7, 'mala': -0.7, 'lento': -0.6, 'lenta': -0.6, 'falla': -0.6,
+        'error': -0.5, 'problema': -0.5, 'molesto': -0.6, 'caro': -0.5, 'estafa': -1.0,
+        'inútil': -0.8, 'decepcionado': -0.7, 'odio': -0.9,
+        'excelente': 1.0, 'genial': 0.9, 'maravilloso': 1.0, 'perfecto': 1.0,
+        'bueno': 0.5, 'buena': 0.5, 'rápido': 0.6, 'fácil': 0.5, 'útil': 0.6,
+        'encanta': 0.9, 'recomiendo': 0.7,
+    },
+    'fr': {
+        'horrible': -1.0, 'terrible': -1.0, 'catastrophe': -1.0, 'nul': -0.8,
+        'mauvais': -0.7, 'mauvaise': -0.7, 'lent': -0.6, 'lente': -0.6, 'plante': -0.8,
+        'erreur': -0.5, 'problème': -0.5, 'pénible': -0.7, 'cher': -0.5, 'arnaque': -1.0,
+        'inutile': -0.8, 'déçu': -0.7, 'déteste': -0.9,
+        'excellent': 1.0, 'génial': 0.9, 'parfait': 1.0, 'merveilleux': 1.0,
+        'bon': 0.5, 'bonne': 0.5, 'rapide': 0.6, 'facile': 0.5, 'utile': 0.6,
+        'adore': 0.9, 'recommande': 0.7,
+    },
+}
+
+# Olumsuzlama ekleri: eşleşen kelimenin polaritesini ters çevirir
+NEGATION_WORDS = {
+    'tr': {'değil', 'yok', 'hiç'},
+    'de': {'nicht', 'kein', 'keine', 'nie', 'niemals'},
+    'es': {'no', 'nunca', 'nada', 'ni'},
+    'fr': {'ne', 'pas', 'jamais', 'aucun', 'aucune'},
+}
+
+# İngilizce TextBlob ile, diğerleri sözlükle desteklenir
+SUPPORTED_SENTIMENT_LANGS = {'en'} | set(SENTIMENT_LEXICONS)
+
+_TOKEN_RE = re.compile(r"[^\w']+", re.UNICODE)
+
+
+def is_sentiment_supported(lang_code):
+    """Verilen dilde sentiment analizi yapılabiliyor mu?"""
+    return (lang_code or 'en').lower() in SUPPORTED_SENTIMENT_LANGS
+
+
+def _lexicon_sentiment(text, lang_code):
+    """Sözlük tabanlı polarite. Olumsuzlama kelimesi öncesindeki 2 token içinde
+    geçiyorsa eşleşen kelimenin işareti ters çevrilir."""
+    lexicon = SENTIMENT_LEXICONS.get(lang_code, {})
+    negations = NEGATION_WORDS.get(lang_code, set())
+    tokens = [t for t in _TOKEN_RE.split(text.lower()) if t]
+
+    scores = []
+    for i, token in enumerate(tokens):
+        polarity = lexicon.get(token)
+        if polarity is None:
+            # Ekli biçimleri yakalamak için önek eşleşmesi (kısa kelimelerde riskli, min 5 harf)
+            for entry, value in lexicon.items():
+                if len(entry) >= 5 and token.startswith(entry):
+                    polarity = value
+                    break
+        if polarity is None:
+            continue
+        window = tokens[max(0, i - 2):i]
+        if any(w in negations for w in window):
+            polarity = -polarity
+        scores.append(polarity)
+
+    if not scores:
+        return 0.0
+    return max(-1.0, min(1.0, sum(scores) / len(scores)))
+
+
+def get_sentiment(text, lang_code='en'):
+    """Yorumun duygu polaritesini [-1, 1] aralığında döndürür.
+
+    İngilizce için TextBlob, desteklenen diğer diller için sözlük tabanlı
+    yöntem kullanılır. Desteklenmeyen dillerde 0.0 döner — bu değerin
+    "nötr" sanılmaması için arayüzde sentiment bölümleri gizlenir
+    (bkz. is_sentiment_supported).
+    """
     try:
         if not isinstance(text, str) or not text.strip():
             return 0.0
-        analysis = TextBlob(text)
-        return analysis.sentiment.polarity
+        lang = (lang_code or 'en').lower()
+        if lang in SENTIMENT_LEXICONS:
+            return _lexicon_sentiment(text, lang)
+        if lang == 'en':
+            return TextBlob(text).sentiment.polarity
+        return 0.0
     except Exception as e:
         print(f"Could not process sentiment for a review. Error: {e}")
         return 0.0
@@ -404,9 +580,14 @@ def preprocess_and_filter_complaints(df, threshold, app_name, lang_code, extra_s
     if complaints_df.empty: 
         return None
 
-    complaints_df['sentiment'] = complaints_df['review'].apply(get_sentiment)
+    complaints_df['sentiment'] = complaints_df['review'].apply(
+        lambda text: get_sentiment(text, lang_code)
+    )
+    # Analiz dilini sonraki adımlara taşı (tema/sentiment dil duyarlılığı için)
+    complaints_df.attrs['lang_code'] = lang_code
 
-    lang_map = {'en': 'english', 'tr': 'turkish'}
+    lang_map = {'en': 'english', 'tr': 'turkish', 'de': 'german',
+                'es': 'spanish', 'fr': 'french'}
     nltk_lang = lang_map.get(lang_code, 'english')
     
     stop_words_list = list(stopwords.words(nltk_lang))
@@ -428,7 +609,11 @@ def preprocess_and_filter_complaints(df, threshold, app_name, lang_code, extra_s
     complaints_df['cleaned_review'] = complaints_df['review'].apply(clean_text)
     return complaints_df
 
-def analyze_and_visualize(df, top_n):
+def analyze_and_visualize(df, top_n, lang_code=None):
+    # Dil açıkça verilmediyse preprocess adımında iliştirilen değeri kullan
+    if lang_code is None:
+        lang_code = df.attrs.get('lang_code', 'en')
+
     all_complaint_text = " ".join(df['cleaned_review'].dropna())
     
     most_common_words = None
@@ -481,8 +666,8 @@ def analyze_and_visualize(df, top_n):
     except Exception as e:
         print(f"Error preparing sample reviews: {e}")
 
-    # Şikayet temalarını çıkar
-    themes = categorize_complaints(df)
+    # Şikayet temalarını çıkar (analiz dilinin anahtar kelimeleri dahil)
+    themes = categorize_complaints(df, lang_code)
 
     # Yükselen (trending) şikayet kelimeleri
     emerging_keywords = get_emerging_keywords(df)
@@ -499,6 +684,8 @@ def analyze_and_visualize(df, top_n):
         'themes': themes,
         'emerging_keywords': emerging_keywords,
         'version_breakdown': version_breakdown,
+        'sentiment_available': is_sentiment_supported(lang_code),
+        'lang_code': lang_code,
     }
 
 
@@ -524,6 +711,8 @@ def build_app_report(google_id, apple_name, country, language, max_reviews,
         'themes': [],
         'emerging_keywords': {'keywords': [], 'recent_count': 0, 'previous_count': 0, 'split_date': None},
         'version_breakdown': [],
+        'sentiment_available': is_sentiment_supported(language),
+        'lang_code': (language or 'en').lower(),
         'error': None,
     }
 
@@ -561,6 +750,6 @@ def build_app_report(google_id, apple_name, country, language, max_reviews,
         return report
 
     report['complaint_count'] = int(len(complaints))
-    analysis = analyze_and_visualize(complaints, top_words)
+    analysis = analyze_and_visualize(complaints, top_words, lang_code=language)
     report.update(analysis)
     return report
