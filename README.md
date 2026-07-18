@@ -102,11 +102,36 @@ Click the "Start Analysis" button.
 
 The results page will display the total number of reviews fetched, the number of complaints analyzed, a list of the most common words, and a word cloud visualization.
 
+Running the Tests
+The test suite runs fully offline — the store-scraping layer is patched out, so no
+network access is required.
+
+Install the development dependencies:
+
+pip install -r requirements-dev.txt
+
+Then run the suite from the project root:
+
+pytest
+
+What is covered:
+
+tests/test_analyzer.py — the pure analysis functions: rating distribution, complaint
+theme categorization, platform comparison, date-range filtering, emerging/trending
+keywords, version breakdown, sentiment, preprocessing, and the end-to-end
+build_app_report pipeline.
+
+tests/test_routes.py — the Flask routes (/, /analyze, /compare, /compare-countries),
+including error paths, the date-filter badge, country de-duplication and the 6-country
+cap, and partial failures where one app or market returns no data.
+
 Technologies Used
 Backend: Python, Flask
 
 Data Analysis: Pandas, NLTK
 
 Visualization: Matplotlib, WordCloud
+
+Testing: pytest
 
 Web Scraping: google-play-scraper, `app-
