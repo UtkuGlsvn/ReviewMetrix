@@ -292,6 +292,41 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* ---- Print / PDF export ---- */
+        @media print {
+            @page {
+                margin: 12mm;
+            }
+
+            body {
+                background: #ffffff !important;
+                background-image: none !important;
+                color: #111827 !important;
+            }
+
+            .back-btn {
+                display: none !important;
+            }
+
+            .vs-app,
+            .metrics-card,
+            .grid-card {
+                background: #ffffff !important;
+                border: 1px solid #d1d5db !important;
+                box-shadow: none !important;
+                backdrop-filter: none !important;
+                break-inside: avoid;
+            }
+
+            .metric-label,
+            .metric-val .sub,
+            .grid-card h3,
+            .vs-app .dev,
+            .kw-list li {
+                color: #374151 !important;
+            }
+        }
     </style>
 </head>
 
@@ -299,7 +334,10 @@
     <div class="dashboard-container">
         <div class="topbar">
             <div class="logo">ReviewMetrix</div>
-            <a href="{{ url_for('main.index') }}" class="back-btn">← New Analysis</a>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="back-btn" onclick="window.print()" style="cursor: pointer; font-family: var(--font-family);">🖨️ Save as PDF</button>
+                <a href="{{ url_for('main.index') }}" class="back-btn">← New Analysis</a>
+            </div>
         </div>
 
         {% if error %}

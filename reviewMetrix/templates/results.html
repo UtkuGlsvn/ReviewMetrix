@@ -467,6 +467,52 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* ---- Print / PDF export ---- */
+        @media print {
+            @page {
+                margin: 12mm;
+            }
+
+            body {
+                background: #ffffff !important;
+                background-image: none !important;
+                color: #111827 !important;
+            }
+
+            .nav-menu,
+            .back-btn,
+            .export-btn {
+                display: none !important;
+            }
+
+            .logo {
+                -webkit-text-fill-color: #8b5cf6;
+            }
+
+            .stat-card,
+            .grid-card {
+                background: #ffffff !important;
+                border: 1px solid #d1d5db !important;
+                box-shadow: none !important;
+                backdrop-filter: none !important;
+                break-inside: avoid;
+            }
+
+            .stat-label,
+            .stat-sub,
+            .stat-value,
+            .grid-card h3,
+            .profile-details p,
+            .reviews-table td {
+                color: #111827 !important;
+            }
+
+            .dashboard-grid,
+            .profile-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
     </style>
 </head>
 
@@ -500,6 +546,7 @@
             <a href="#keywords">Keywords</a>
             <a href="#reviews">Reviews</a>
             {% if sample_reviews %}<button type="button" class="export-btn" onclick="exportReviewsCSV()">⬇ Export CSV</button>{% endif %}
+            <button type="button" class="export-btn" onclick="window.print()">🖨️ Save as PDF</button>
         </nav>
 
         {% if date_range and (date_range.start or date_range.end) %}

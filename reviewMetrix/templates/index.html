@@ -304,12 +304,14 @@
         .button-row {
             grid-column: 1 / -1;
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 16px;
         }
 
         .button-row .submit-btn {
             grid-column: auto;
+            font-size: 1rem;
+            padding: 15px;
         }
 
         .compare-btn {
@@ -320,6 +322,16 @@
         .compare-btn:hover {
             background: linear-gradient(135deg, #f472b6 0%, #be185d 100%);
             box-shadow: 0 6px 20px rgba(219, 39, 119, 0.4);
+        }
+
+        .country-btn {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%);
+            box-shadow: 0 4px 12px rgba(3, 105, 161, 0.3);
+        }
+
+        .country-btn:hover {
+            background: linear-gradient(135deg, #38bdf8 0%, #075985 100%);
+            box-shadow: 0 6px 20px rgba(3, 105, 161, 0.4);
         }
 
         @media (max-width: 768px) {
@@ -424,12 +436,24 @@
                     <p class="info-text">Fill these in, then use the <strong>Compare Two Apps</strong> button below. Shared settings (country, language, review count, threshold) apply to both apps.</p>
                 </details>
 
+                <details class="competitor-section full-width">
+                    <summary>🌍 Compare across countries <span>(optional — same app in multiple markets)</span></summary>
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label for="countries">Country Codes (comma-separated, max 6)</label>
+                        <input type="text" id="countries" name="countries" placeholder="e.g. us, gb, de, fr, tr, jp">
+                        <p class="info-text">Uses the main app (above) across each market. Then click <strong>Compare Countries</strong>.</p>
+                    </div>
+                </details>
+
                 <div class="button-row full-width">
                     <button type="submit" class="submit-btn">
                         <span>Fetch &amp; Analyze Reviews</span>
                     </button>
                     <button type="submit" class="submit-btn compare-btn" formaction="{{ url_for('main.compare_apps') }}">
                         <span>⚔️ Compare Two Apps</span>
+                    </button>
+                    <button type="submit" class="submit-btn country-btn" formaction="{{ url_for('main.compare_countries') }}">
+                        <span>🌍 Compare Countries</span>
                     </button>
                 </div>
             </form>

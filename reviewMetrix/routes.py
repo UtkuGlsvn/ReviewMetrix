@@ -88,3 +88,68 @@ def compare_apps():
         print(f"A compare error occurred: {e}")
         return render_template('compare.html',
                                error=f"An unexpected error occurred: {e}")
+
+
+def _avg_store_rating(summary_stats):
+    """summary_stats içindeki Google + iOS puanlarının ortalamasını döndürür (yoksa None)."""
+    vals = []
+    if summary_stats:
+        if summary_stats.get('google') and summary_stats['google'].get('rating'):
+            vals.append(summary_stats['google']['rating'])
+        if summary_stats.get('ios') and summary_stats['ios'].get('rating'):
+            vals.append(summary_stats['ios']['rating'])
+    return round(sum(vals) / len(vals), 2) if vals else None
+
+
+@main_bp.route('/compare-countries', methods=['POST'])
+def compare_countries():
+    """Aynı uygulamayı birden fazla ülkede analiz edip yan yana karşılaştırır."""
+    try:
+        params = _parse_common_params()
+        google_id = request.form.get('google_id', '')
+        apple_name = request.form.get('apple_name', '')
+
+        countries_raw = request.form.get('countries', '')
+        # Ülke kodlarını ayıkla, tekrarları kaldır, en fazla 6 ülke
+        seen, countries = set(), []
+        for c in countries_raw.split(','):
+            code = c.strip().lower()
+            if code and code not in seen:
+                seen.add(code)
+                countries.append(code)
+        countries = countries[:6]
+
+        if not countries:
+            return render_template('compare_countries.html',
+                                   error="Please provide at least one country code (e.g. us, gb, de).")
+
+        reports = []
+        for code in countries:
+            rep = analyzer.build_app_report(
+                google_id, apple_name, code, params['language'], params['max_reviews'],
+                params['complaint_threshold'], params['top_words'],
+                params['extra_stopwords_str'], params['start_date'], params['end_date'],
+            )
+            rep['country'] = code.upper()
+            rep['avg_store_rating'] = _avg_store_rating(rep['summary_stats'])
+            rep['avg_complaint_sentiment'] = (
+                rep['sentiment_summary']['average_polarity'] if rep['sentiment_summary'] else None
+            )
+            rep['top_theme'] = rep['themes'][0]['theme'] if rep['themes'] else None
+            reports.append(rep)
+
+        chart_data = [{
+            'country': r['country'],
+            'store_rating': r['avg_store_rating'] or 0,
+            'complaints': r['complaint_count'],
+            'sentiment': r['avg_complaint_sentiment'] or 0,
+            'total': r['total_reviews'],
+        } for r in reports]
+
+        return render_template('compare_countries.html',
+                               reports=reports, chart_data=chart_data,
+                               app_label=(apple_name or google_id or 'App'))
+    except Exception as e:
+        print(f"A country-compare error occurred: {e}")
+        return render_template('compare_countries.html',
+                               error=f"An unexpected error occurred: {e}")
