@@ -20,6 +20,7 @@ def _parse_common_params():
         'extra_stopwords_str': request.form.get('extra_stopwords', ''),
         'start_date': request.form.get('start_date', '').strip() or None,
         'end_date': request.form.get('end_date', '').strip() or None,
+        'force_refresh': request.form.get('force_refresh') is not None,
     }
 
 
@@ -33,7 +34,7 @@ def analyze_reviews():
             params['country'], params['language'], params['max_reviews'],
             params['complaint_threshold'], params['top_words'],
             params['extra_stopwords_str'],
-            params['start_date'], params['end_date'],
+            params['start_date'], params['end_date'], params['force_refresh'],
         )
 
         # build_app_report kısmi hatalarda bile summary/dağılımı döndürür
@@ -73,14 +74,14 @@ def compare_apps():
             params['country'], params['language'], params['max_reviews'],
             params['complaint_threshold'], params['top_words'],
             params['extra_stopwords_str'],
-            params['start_date'], params['end_date'],
+            params['start_date'], params['end_date'], params['force_refresh'],
         )
         app_b = analyzer.build_app_report(
             request.form.get('google_id_b', ''), request.form.get('apple_name_b', ''),
             params['country'], params['language'], params['max_reviews'],
             params['complaint_threshold'], params['top_words'],
             params['extra_stopwords_str'],
-            params['start_date'], params['end_date'],
+            params['start_date'], params['end_date'], params['force_refresh'],
         )
 
         return render_template('compare.html', app_a=app_a, app_b=app_b)
@@ -129,6 +130,7 @@ def compare_countries():
                 google_id, apple_name, code, params['language'], params['max_reviews'],
                 params['complaint_threshold'], params['top_words'],
                 params['extra_stopwords_str'], params['start_date'], params['end_date'],
+                params['force_refresh'],
             )
             rep['country'] = code.upper()
             rep['avg_store_rating'] = _avg_store_rating(rep['summary_stats'])

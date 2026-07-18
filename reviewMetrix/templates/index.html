@@ -301,6 +301,46 @@
             margin-top: 20px;
         }
 
+        .checkbox-row {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 14px 18px;
+            cursor: pointer;
+            text-transform: none;
+            letter-spacing: normal;
+            font-size: 0.9rem;
+            margin: 0;
+        }
+
+        .checkbox-row input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent-primary);
+            cursor: pointer;
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+
+        .checkbox-row strong {
+            display: block;
+            color: var(--text-primary);
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
+
+        .checkbox-row em {
+            display: block;
+            color: var(--text-secondary);
+            font-style: normal;
+            font-weight: 400;
+            font-size: 0.8rem;
+        }
+
         .button-row {
             grid-column: 1 / -1;
             display: grid;
@@ -420,6 +460,14 @@
                     <textarea id="extra_stopwords" name="extra_stopwords" rows="2">one,get,like,app,application</textarea>
                     <p class="info-text">Words to ignore. (e.g. for game: game, level, play)</p>
                 </div>
+
+                <label class="checkbox-row full-width" for="force_refresh">
+                    <input type="checkbox" id="force_refresh" name="force_refresh">
+                    <span>
+                        <strong>Force refresh</strong>
+                        <em>Skip the 1-hour cache and re-scrape the stores. Slower, but guarantees the latest reviews.</em>
+                    </span>
+                </label>
 
                 <details class="competitor-section full-width">
                     <summary>⚔️ Compare with a competitor <span>(optional — enables side-by-side comparison)</span></summary>

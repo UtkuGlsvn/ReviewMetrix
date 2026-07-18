@@ -9,6 +9,19 @@ import pytest
 from reviewMetrix import create_app
 
 
+@pytest.fixture(autouse=True)
+def clear_cache():
+    """Her testten önce/sonra scraping cache'ini boşaltır.
+
+    Cache modül düzeyinde yaşadığı için temizlenmezse bir testin sahte verisi
+    başka bir teste sızar ve monkeypatch'ler etkisiz kalır.
+    """
+    from reviewMetrix import analyzer
+    analyzer.clear_review_cache()
+    yield
+    analyzer.clear_review_cache()
+
+
 @pytest.fixture
 def app():
     """Test için Flask uygulaması."""

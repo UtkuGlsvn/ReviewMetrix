@@ -2,7 +2,10 @@
 import pandas as pd
 from nltk.corpus import stopwords
 import re
-from collections import Counter
+import time
+import copy
+import threading
+from collections import Counter, OrderedDict
 from wordcloud import WordCloud
 import matplotlib
 matplotlib.use('Agg')
@@ -95,6 +98,74 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
         print(f"Apple Store fetch review error ->: {e}")
     
     reviews_df = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
+    return reviews_df, summary_stats
+
+
+# ---------------------------------------------------------------------------
+# Scraping sonuçları için TTL cache
+#
+# Mağaza scraping'i yavaş ve rate-limit'e tabi. Aynı (uygulama, ülke, dil,
+# yorum sayısı) kombinasyonu kısa süre içinde tekrar istendiğinde yeniden
+# scrape etmek yerine bellekten dönüyoruz. Özellikle çoklu ülke karşılaştırması
+# ve ardışık denemelerde ciddi hız kazancı sağlıyor.
+# ---------------------------------------------------------------------------
+
+CACHE_TTL_SECONDS = 3600   # 1 saat
+CACHE_MAX_ENTRIES = 32     # bellek kullanımını sınırlar (LRU tahliye)
+
+_review_cache = OrderedDict()  # key -> (timestamp, DataFrame, summary_stats)
+_cache_lock = threading.Lock()
+
+
+def clear_review_cache():
+    """Cache'i tamamen boşaltır (testler ve manuel yenileme için)."""
+    with _cache_lock:
+        _review_cache.clear()
+
+
+def review_cache_info():
+    """Cache durumunu döndürür."""
+    with _cache_lock:
+        return {
+            'entries': len(_review_cache),
+            'ttl_seconds': CACHE_TTL_SECONDS,
+            'max_entries': CACHE_MAX_ENTRIES,
+        }
+
+
+def fetch_reviews_cached(google_id, apple_name, country, lang,
+                         max_reviews_to_fetch, ttl=None):
+    """fetch_reviews_store'un TTL cache'li sarmalayıcısı.
+
+    ttl=0 verilirse cache atlanır (zorunlu yenileme). Boş sonuçlar cache'lenmez;
+    scraper'ın geçici hatası bir saat boyunca sabitlenmesin diye.
+    Dönen veriler kopyadır, böylece çağıran taraf cache'i bozamaz.
+    """
+    ttl = CACHE_TTL_SECONDS if ttl is None else ttl
+    key = (google_id, apple_name, country, lang, max_reviews_to_fetch)
+    now = time.time()
+
+    with _cache_lock:
+        entry = _review_cache.get(key)
+        if entry is not None:
+            cached_at, cached_df, cached_stats = entry
+            if now - cached_at < ttl:
+                _review_cache.move_to_end(key)  # LRU: en son kullanılan sona
+                return cached_df.copy(), copy.deepcopy(cached_stats)
+            del _review_cache[key]  # süresi dolmuş
+
+    reviews_df, summary_stats = fetch_reviews_store(
+        google_id, apple_name, country, lang, max_reviews_to_fetch
+    )
+
+    if reviews_df is not None and not reviews_df.empty:
+        with _cache_lock:
+            _review_cache[key] = (time.time(), reviews_df.copy(),
+                                  copy.deepcopy(summary_stats))
+            _review_cache.move_to_end(key)
+            while len(_review_cache) > CACHE_MAX_ENTRIES:
+                _review_cache.popitem(last=False)  # en eski kullanılanı at
+
     return reviews_df, summary_stats
 
 
@@ -433,10 +504,11 @@ def analyze_and_visualize(df, top_n):
 
 def build_app_report(google_id, apple_name, country, language, max_reviews,
                      complaint_threshold, top_words, extra_stopwords_str="",
-                     start_date=None, end_date=None):
+                     start_date=None, end_date=None, force_refresh=False):
     """Tek bir uygulama için uçtan uca analiz çalıştırıp konsolide bir rapor dict'i döndürür.
     Hem /analyze hem de /compare route'ları tarafından kullanılır.
-    start_date/end_date verilirse yorumlar bu tarih aralığına göre filtrelenir."""
+    start_date/end_date verilirse yorumlar bu tarih aralığına göre filtrelenir.
+    force_refresh=True ise cache atlanır ve mağazadan yeniden çekilir."""
     report = {
         'name': apple_name or google_id or 'Unknown App',
         'summary_stats': {'google': None, 'ios': None},
@@ -455,8 +527,9 @@ def build_app_report(google_id, apple_name, country, language, max_reviews,
         'error': None,
     }
 
-    all_reviews, summary_stats = fetch_reviews_store(
-        google_id, apple_name, country, language, max_reviews
+    all_reviews, summary_stats = fetch_reviews_cached(
+        google_id, apple_name, country, language, max_reviews,
+        ttl=0 if force_refresh else None,
     )
     report['summary_stats'] = summary_stats
 
