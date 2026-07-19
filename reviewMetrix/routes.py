@@ -58,6 +58,7 @@ def analyze_reviews():
             sentiment_available=report['sentiment_available'],
             lang_code=report['lang_code'],
             aso=report['aso'],
+            momentum=report['momentum'],
         )
     except Exception as e:
         print(f"An error occurred: {e}")

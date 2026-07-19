@@ -40,10 +40,16 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
             if 'reviewCreatedVersion' in google_df.columns:
                 cols.append('reviewCreatedVersion')
                 rename['reviewCreatedVersion'] = 'version'
+            # Beğeni sayısı: bir şikayeti kaç kullanıcının daha onayladığını gösterir
+            if 'thumbsUpCount' in google_df.columns:
+                cols.append('thumbsUpCount')
+                rename['thumbsUpCount'] = 'likes'
             google_df_renamed = google_df[cols].rename(columns=rename)
             google_df_renamed['platform'] = 'Google Play'
             if 'version' not in google_df_renamed.columns:
                 google_df_renamed['version'] = None
+            if 'likes' not in google_df_renamed.columns:
+                google_df_renamed['likes'] = 0
             all_dfs.append(google_df_renamed)
         
         gp_details = google_app_details(google_id, lang=lang, country=country)
@@ -96,6 +102,7 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
             apple_df_renamed = apple_df[['review', 'rating', 'date']].rename(columns={'rating': 'score'})
             apple_df_renamed['platform'] = 'App Store'
             apple_df_renamed['version'] = None  # App Store scraper sürüm bilgisi vermiyor
+            apple_df_renamed['likes'] = 0       # App Store beğeni sayısı vermiyor
             all_dfs.append(apple_df_renamed)
     except Exception as e:  
         print(f"Apple Store fetch review error ->: {e}")
@@ -253,6 +260,69 @@ def get_theme_keywords(lang_code='en'):
     return base
 
 
+# Yaşam boyu ile güncel puan farkının "düşüşte" sayılacağı eşik (yıldız)
+MOMENTUM_DECLINE_THRESHOLD = -0.3
+MOMENTUM_IMPROVE_THRESHOLD = 0.3
+
+
+def get_momentum(summary_stats, all_reviews):
+    """Mağazanın gösterdiği YAŞAM BOYU ortalama ile ÇEKİLEN GÜNCEL yorumların
+    ortalamasını karşılaştırır.
+
+    Mağaza her zaman yaşam boyu ortalamayı gösterir; milyonlarca eski yorum
+    bugünkü bir çöküşü gizleyebilir. Aradaki fark "uygulama düşüşte mi?"
+    sorusunu doğrudan cevaplar.
+    """
+    result = {'platforms': [], 'available': False}
+    if all_reviews is None or all_reviews.empty or 'score' not in all_reviews.columns:
+        return result
+
+    try:
+        work = all_reviews.copy()
+        work['score'] = pd.to_numeric(work['score'], errors='coerce')
+        work = work.dropna(subset=['score'])
+        if work.empty:
+            return result
+
+        stats = summary_stats or {}
+        store_map = {'Google Play': stats.get('google'), 'App Store': stats.get('ios')}
+
+        for platform, store in store_map.items():
+            if not store or not store.get('rating'):
+                continue
+            if 'platform' in work.columns:
+                subset = work[work['platform'] == platform]
+            else:
+                subset = work
+            if subset.empty:
+                continue
+
+            lifetime = float(store['rating'])
+            recent = float(subset['score'].mean())
+            delta = recent - lifetime
+
+            if delta <= MOMENTUM_DECLINE_THRESHOLD:
+                status = 'declining'
+            elif delta >= MOMENTUM_IMPROVE_THRESHOLD:
+                status = 'improving'
+            else:
+                status = 'stable'
+
+            result['platforms'].append({
+                'platform': platform,
+                'lifetime': round(lifetime, 2),
+                'recent': round(recent, 2),
+                'delta': round(delta, 2),
+                'status': status,
+                'sample': int(len(subset)),
+            })
+
+        result['available'] = bool(result['platforms'])
+    except Exception as e:
+        print(f"Error computing momentum: {e}")
+    return result
+
+
 def get_rating_distribution(df):
     """Çekilen TÜM yorumların yıldız (1-5) dağılımını hem toplam
     hem de platform bazında döndürür. Sensor Tower tarzı bir görünüm sağlar."""
@@ -289,17 +359,58 @@ def categorize_complaints(df, lang_code='en'):
     try:
         theme_keywords = get_theme_keywords(lang_code)
         counts = {theme: 0 for theme in theme_keywords}
-        texts = df['review'].dropna().astype(str).str.lower().tolist()
-        for text in texts:
+        likes = {theme: 0 for theme in theme_keywords}
+        score_sums = {theme: 0.0 for theme in theme_keywords}
+
+        work = df.dropna(subset=['review']).copy()
+        # itertuples alt çizgiyle başlayan kolon adlarını konumsal isimlere çevirir,
+        # bu yüzden normal bir ad kullanıyoruz
+        work['text_lower'] = work['review'].astype(str).str.lower()
+        has_likes = 'likes' in work.columns
+        has_score = 'score' in work.columns
+        if has_likes:
+            work['likes'] = pd.to_numeric(work['likes'], errors='coerce').fillna(0)
+        if has_score:
+            work['score'] = pd.to_numeric(work['score'], errors='coerce')
+
+        for row in work.itertuples(index=False):
+            text = row.text_lower
+            row_likes = int(getattr(row, 'likes', 0) or 0) if has_likes else 0
+            row_score = getattr(row, 'score', None) if has_score else None
             for theme, keywords in theme_keywords.items():
                 if any(kw in text for kw in keywords):
                     counts[theme] += 1
-        total = len(texts) or 1
-        themes = [
-            {'theme': theme, 'count': cnt, 'percent': round(cnt * 100 / total, 1)}
-            for theme, cnt in counts.items() if cnt > 0
-        ]
-        themes.sort(key=lambda x: x['count'], reverse=True)
+                    likes[theme] += row_likes
+                    if row_score is not None and not pd.isna(row_score):
+                        score_sums[theme] += float(row_score)
+
+        total = len(work) or 1
+        themes = []
+        for theme, cnt in counts.items():
+            if cnt == 0:
+                continue
+            avg_score = round(score_sums[theme] / cnt, 2) if has_score and score_sums[theme] else None
+            # Öncelik = etkilenen kullanıcı sayısı × şiddet
+            #   etkilenen  = şikayet sayısı + beğeniler (her beğeni "ben de" demektir)
+            #   şiddet     = 5 - ortalama puan (daha düşük puan = daha ağır sorun)
+            affected = cnt + likes[theme]
+            severity = (5 - avg_score) if avg_score is not None else 3.0
+            themes.append({
+                'theme': theme,
+                'count': cnt,
+                'percent': round(cnt * 100 / total, 1),
+                'likes': likes[theme],
+                'avg_score': avg_score,
+                'affected': affected,
+                'priority_raw': round(affected * severity, 2),
+            })
+
+        # Görüntüleme için en yüksek önceliğe göre 0-100 arasına normalize et
+        max_priority = max((t['priority_raw'] for t in themes), default=0)
+        for t in themes:
+            t['priority'] = round(t['priority_raw'] * 100 / max_priority) if max_priority else 0
+
+        themes.sort(key=lambda x: x['priority_raw'], reverse=True)
     except Exception as e:
         print(f"Error categorizing complaints: {e}")
     return themes
@@ -660,11 +771,19 @@ def analyze_and_visualize(df, top_n, lang_code=None):
 
     sample_reviews = []
     try:
-        sample_df = df.copy().head(50)
+        sample_df = df.copy()
+        # En çok beğenilen şikayetler en üstte: beğeni sayısı, kaç kullanıcının
+        # aynı sorunu onayladığını gösterir
+        if 'likes' in sample_df.columns:
+            sample_df['likes'] = pd.to_numeric(sample_df['likes'], errors='coerce').fillna(0).astype(int)
+            sample_df = sample_df.sort_values('likes', ascending=False)
+        sample_df = sample_df.head(50)
         sample_df['sentiment'] = sample_df['sentiment'].round(2)
         cols = ['review', 'score', 'sentiment']
         if 'platform' in sample_df.columns:
             cols.append('platform')
+        if 'likes' in sample_df.columns:
+            cols.append('likes')
         sample_reviews = sample_df[cols].to_dict(orient='records')
     except Exception as e:
         print(f"Error preparing sample reviews: {e}")
@@ -928,6 +1047,7 @@ def build_app_report(google_id, apple_name, country, language, max_reviews,
         'lang_code': (language or 'en').lower(),
         'aso': {'metadata': [], 'keyword_opportunities': [], 'listing_keywords': [],
                 'reviews_analyzed': 0, 'available': False},
+        'momentum': {'platforms': [], 'available': False},
         'error': None,
     }
 
@@ -956,8 +1076,9 @@ def build_app_report(google_id, apple_name, country, language, max_reviews,
     report['total_reviews'] = int(len(all_reviews))
     report['rating_distribution'] = get_rating_distribution(all_reviews)
     report['platform_comparison'] = get_platform_comparison(all_reviews)
-    # ASO şikayet filtresinden bağımsız: tüm yorumların dilini kullanır
+    # ASO ve momentum şikayet filtresinden bağımsız: tüm yorumları kullanır
     report['aso'] = get_aso_report(summary_stats, all_reviews, language)
+    report['momentum'] = get_momentum(summary_stats, all_reviews)
 
     complaints = preprocess_and_filter_complaints(
         all_reviews, complaint_threshold, apple_name, language, extra_stopwords_str

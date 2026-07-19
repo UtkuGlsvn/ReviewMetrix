@@ -408,6 +408,152 @@
             color: #f472b6;
         }
 
+        /* Rating momentum */
+        .momentum-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 18px;
+        }
+
+        .momentum-card {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--card-border);
+            border-left: 3px solid var(--text-secondary);
+            border-radius: 14px;
+            padding: 18px;
+        }
+
+        .momentum-card.mo-declining {
+            border-left-color: var(--red);
+        }
+
+        .momentum-card.mo-improving {
+            border-left-color: var(--green);
+        }
+
+        .momentum-card.mo-stable {
+            border-left-color: var(--yellow);
+        }
+
+        .momentum-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .momentum-status {
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+        }
+
+        .momentum-status.mo-declining {
+            color: var(--red);
+        }
+
+        .momentum-status.mo-improving {
+            color: var(--green);
+        }
+
+        .momentum-status.mo-stable {
+            color: var(--yellow);
+        }
+
+        .momentum-values {
+            display: flex;
+            align-items: flex-end;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .mo-label {
+            display: block;
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 2px;
+        }
+
+        .momentum-values strong {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.9rem;
+            font-weight: 700;
+        }
+
+        .mo-lifetime {
+            color: var(--text-secondary);
+        }
+
+        .mo-recent.mo-declining {
+            color: var(--red);
+        }
+
+        .mo-recent.mo-improving {
+            color: var(--green);
+        }
+
+        .mo-recent.mo-stable {
+            color: var(--yellow);
+        }
+
+        .mo-arrow {
+            color: var(--text-secondary);
+            font-size: 1.3rem;
+            padding-bottom: 6px;
+        }
+
+        .mo-delta {
+            margin-left: auto;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 1.1rem;
+            padding: 3px 10px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .mo-delta.mo-declining {
+            color: var(--red);
+        }
+
+        .mo-delta.mo-improving {
+            color: var(--green);
+        }
+
+        .mo-delta.mo-stable {
+            color: var(--yellow);
+        }
+
+        .mo-note {
+            margin: 14px 0 0 0;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .mo-note strong {
+            color: var(--text-primary);
+        }
+
+        /* Theme priority table */
+        .priority-table-wrapper {
+            overflow-x: auto;
+            margin-top: 18px;
+        }
+
+        .priority-bar {
+            display: inline-block;
+            height: 6px;
+            border-radius: 3px;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            vertical-align: middle;
+            margin-right: 8px;
+            min-width: 4px;
+        }
+
         /* ASO section */
         .aso-meta-grid {
             display: grid;
@@ -806,6 +952,7 @@
         {% else %}
         <nav class="nav-menu">
             <a href="#overview">Overview</a>
+            {% if momentum and momentum.available %}<a href="#momentum">Momentum</a>{% endif %}
             {% if platform_comparison %}<a href="#compare">Platforms</a>{% endif %}
             {% if rating_distribution %}<a href="#distribution">Ratings</a>{% endif %}
             {% if themes %}<a href="#themes">Themes</a>{% endif %}
@@ -904,6 +1051,55 @@
             {% endif %}
         </div>
 
+        {% if momentum and momentum.available %}
+        <div id="momentum" class="section-anchor"></div>
+        <div class="grid-card full-width-card" style="margin-bottom: 30px;">
+            <h3>📉 Rating Momentum
+                <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">
+                    lifetime store average vs. the reviews scraped now
+                </span>
+            </h3>
+            <div class="momentum-grid">
+                {% for m in momentum.platforms %}
+                <div class="momentum-card mo-{{ m.status }}">
+                    <div class="momentum-head">
+                        {% if m.platform == 'Google Play' %}<span class="platform-tag google">Google Play</span>
+                        {% else %}<span class="platform-tag ios">App Store</span>{% endif %}
+                        <span class="momentum-status mo-{{ m.status }}">
+                            {% if m.status == 'declining' %}▼ Declining
+                            {% elif m.status == 'improving' %}▲ Improving
+                            {% else %}▬ Stable{% endif %}
+                        </span>
+                    </div>
+                    <div class="momentum-values">
+                        <div>
+                            <span class="mo-label">Lifetime</span>
+                            <strong class="mo-lifetime">{{ "%.2f"|format(m.lifetime) }}</strong>
+                        </div>
+                        <span class="mo-arrow">→</span>
+                        <div>
+                            <span class="mo-label">Last {{ m.sample }} reviews</span>
+                            <strong class="mo-recent mo-{{ m.status }}">{{ "%.2f"|format(m.recent) }}</strong>
+                        </div>
+                        <div class="mo-delta mo-{{ m.status }}">{{ "%+.2f"|format(m.delta) }}</div>
+                    </div>
+                    <p class="mo-note">
+                        {% if m.status == 'declining' %}
+                        Recent reviews rate this app <strong>{{ "%.2f"|format(m.delta|abs) }} stars lower</strong>
+                        than its lifetime average — the store rating still hides this.
+                        {% elif m.status == 'improving' %}
+                        Recent reviews rate this app <strong>{{ "%.2f"|format(m.delta) }} stars higher</strong>
+                        than its lifetime average; the store rating lags behind.
+                        {% else %}
+                        Recent reviews are in line with the lifetime average.
+                        {% endif %}
+                    </p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         {% if platform_comparison %}
         <div id="compare" class="section-anchor"></div>
         <div class="grid-card full-width-card" style="margin-bottom: 30px;">
@@ -941,6 +1137,57 @@
             </div>
             {% endif %}
         </div>
+
+        {% if themes %}
+        <div class="grid-card full-width-card" style="margin-bottom: 30px;">
+            <h3>🔧 Fix First — Prioritized Issues
+                <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">
+                    priority = (complaints + likes) × severity
+                </span>
+            </h3>
+            <div class="priority-table-wrapper">
+                <table class="reviews-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 32%;">Theme</th>
+                            <th style="width: 22%;">Priority</th>
+                            <th>Complaints</th>
+                            <th>👍 Likes</th>
+                            <th>Users affected</th>
+                            <th>Avg ⭐</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in themes %}
+                        <tr>
+                            <td style="font-weight: 600;">{{ t.theme }}</td>
+                            <td>
+                                <span class="priority-bar" style="width: {{ (t.priority * 0.6)|round|int }}px;"></span>
+                                <strong style="font-family: 'Outfit', sans-serif;">{{ t.priority }}</strong>
+                            </td>
+                            <td>{{ t.count }} <span style="color: var(--text-secondary); font-size: 0.8rem;">({{ t.percent }}%)</span></td>
+                            <td>{% if t.likes %}<strong style="color: var(--accent-secondary);">{{ t.likes }}</strong>{% else %}<span style="color: var(--text-secondary);">—</span>{% endif %}</td>
+                            <td><strong>{{ t.affected }}</strong></td>
+                            <td>
+                                {% if t.avg_score is not none %}
+                                <span style="color: var(--yellow);">{{ "%.2f"|format(t.avg_score) }}</span>
+                                {% else %}<span style="color: var(--text-secondary);">—</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p style="margin: 14px 0 0 0; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5;">
+                Ranked by impact rather than raw volume: each like counts as another affected user, and themes with
+                lower average ratings weigh more. A theme with few complaints but many likes can outrank a more
+                frequent but milder one.
+                {% if not (themes | selectattr('likes') | list) %}
+                <br><em>Likes are only available for Google Play reviews.</em>
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
 
         {% if emerging_keywords and emerging_keywords.keywords %}
         <div id="trending" class="section-anchor"></div>
@@ -1125,8 +1372,9 @@
                     <table class="reviews-table" id="reviewsTable">
                         <thead>
                             <tr>
-                                <th style="width: 12%;">Platform</th>
-                                <th style="width: 13%;">Score</th>
+                                <th style="width: 11%;">Platform</th>
+                                <th style="width: 9%;">👍</th>
+                                <th style="width: 12%;">Score</th>
                                 {% if sentiment_available is not defined or sentiment_available %}<th style="width: 15%;">Sentiment</th>{% endif %}
                                 <th>Review Content</th>
                             </tr>
@@ -1138,6 +1386,10 @@
                                 <td>
                                     {% if rev.platform == 'Google Play' %}<span class="platform-tag google">Play</span>
                                     {% elif rev.platform == 'App Store' %}<span class="platform-tag ios">iOS</span>
+                                    {% else %}<span style="color: var(--text-secondary);">—</span>{% endif %}
+                                </td>
+                                <td>
+                                    {% if rev.likes %}<strong style="color: var(--accent-secondary);">{{ rev.likes }}</strong>
                                     {% else %}<span style="color: var(--text-secondary);">—</span>{% endif %}
                                 </td>
                                 <td>
@@ -1161,7 +1413,7 @@
                             {% endfor %}
                             {% else %}
                             <tr>
-                                <td colspan="{% if sentiment_available is not defined or sentiment_available %}4{% else %}3{% endif %}"
+                                <td colspan="{% if sentiment_available is not defined or sentiment_available %}5{% else %}4{% endif %}"
                                     style="text-align: center; color: var(--text-secondary);">No reviews to display.</td>
                             </tr>
                             {% endif %}
@@ -1346,13 +1598,23 @@
             colors: ['#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#60a5fa', '#f472b6', '#a78bfa', '#ef4444', '#34d399', '#fbbf24'],
             dataLabels: {
                 enabled: true,
-                formatter: (val, opt) => themesData[opt.dataPointIndex].percent + '%',
+                formatter: (val) => val,
                 style: { colors: ['#f3f4f6'] }
             },
             legend: { show: false },
-            series: [{ name: 'Complaints', data: themesData.map(t => t.count) }],
-            xaxis: { categories: themesData.map(t => t.theme) },
-            tooltip: { y: { formatter: (val, opt) => val + ' complaints (' + themesData[opt.dataPointIndex].percent + '%)' } }
+            // Ham adet yerine öncelik: (şikayet + beğeni) × şiddet
+            series: [{ name: 'Priority', data: themesData.map(t => t.priority) }],
+            xaxis: { categories: themesData.map(t => t.theme), max: 100 },
+            tooltip: {
+                y: {
+                    formatter: (val, opt) => {
+                        const t = themesData[opt.dataPointIndex];
+                        const likes = t.likes ? ' · ' + t.likes + ' likes' : '';
+                        const score = t.avg_score !== null ? ' · avg ⭐' + t.avg_score : '';
+                        return 'priority ' + val + ' (' + t.count + ' complaints' + likes + score + ')';
+                    }
+                }
+            }
         };
         new ApexCharts(document.querySelector("#themesChart"), themesOptions).render();
         {% endif %}
@@ -1385,9 +1647,9 @@
         {% if sample_reviews %}
         const sampleReviews = {{ sample_reviews | tojson | safe }};
         function exportReviewsCSV() {
-            const header = ['platform', 'score', 'sentiment', 'review'];
+            const header = ['platform', 'likes', 'score', 'sentiment', 'review'];
             const escape = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-            const rows = sampleReviews.map(r => [r.platform || '', r.score, r.sentiment, r.review].map(escape).join(','));
+            const rows = sampleReviews.map(r => [r.platform || '', r.likes ?? 0, r.score, r.sentiment, r.review].map(escape).join(','));
             const csv = [header.join(','), ...rows].join('\n');
             const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');

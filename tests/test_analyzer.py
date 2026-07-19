@@ -42,14 +42,16 @@ def test_categorize_complaints_detects_expected_themes(reviews_df):
     assert 'Price & Payment' in found     # "refund my money, subscription"
 
 
-def test_categorize_complaints_sorted_desc_and_percent_bounded(reviews_df):
+def test_categorize_complaints_sorted_by_priority_and_percent_bounded(reviews_df):
+    """Temalar ham adede göre değil ÖNCELİĞE göre sıralanır."""
     themes = analyzer.categorize_complaints(reviews_df)
 
-    counts = [t['count'] for t in themes]
-    assert counts == sorted(counts, reverse=True), "temalar azalan sırada olmalı"
+    priorities = [t['priority_raw'] for t in themes]
+    assert priorities == sorted(priorities, reverse=True), "temalar önceliğe göre azalan sırada olmalı"
     for t in themes:
         assert t['count'] > 0
         assert 0 < t['percent'] <= 100
+        assert 0 <= t['priority'] <= 100
 
 
 def test_categorize_complaints_empty_input():
