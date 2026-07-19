@@ -211,9 +211,55 @@
             margin: 0 0 20px 0;
         }
 
+        /* Grid cocuklari icerikten dar olamazsa (min-width: auto) genis ApexCharts
+           SVG'si track'i sisirip sayfayi yana kaydiriyor */
+        .grid-card,
+        .country-card {
+            min-width: 0;
+        }
+
+        .grid-card svg,
+        .apexcharts-canvas {
+            max-width: 100% !important;
+        }
+
         @media (max-width: 1024px) {
             .chart-grid {
                 grid-template-columns: 1fr;
+            }
+        }
+
+        /* ---- Mobil ---- */
+        @media (max-width: 640px) {
+            .dashboard-container {
+                padding: 20px 14px;
+            }
+
+            .topbar {
+                flex-wrap: wrap;
+                gap: 12px;
+            }
+
+            .logo {
+                font-size: 1.7rem;
+            }
+
+            .grid-card {
+                padding: 20px 16px;
+            }
+
+            .grid-card h3 {
+                font-size: 1.15rem;
+            }
+
+            /* Sabit minimum genislik dar ekranda tasmaya yol aciyor */
+            .country-grid {
+                grid-template-columns: 1fr;
+                gap: 14px;
+            }
+
+            .subtitle {
+                font-size: 0.95rem;
             }
         }
 

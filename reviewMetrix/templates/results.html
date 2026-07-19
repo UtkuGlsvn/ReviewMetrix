@@ -618,11 +618,122 @@
             font-size: 0.8rem;
         }
 
+        /* Grid/flex çocukları varsayılan olarak içeriklerinden daha dar olamaz
+           (min-width: auto). ApexCharts'ın ürettiği geniş SVG bu yüzden track'i
+           şişirip tüm sayfayı yana kaydırıyordu. */
+        .grid-card,
+        .stat-card,
+        .aso-meta-card,
+        .trending-item,
+        .compare-card {
+            min-width: 0;
+        }
+
+        .grid-card svg,
+        .grid-card canvas,
+        .apexcharts-canvas {
+            max-width: 100% !important;
+        }
+
         @media (max-width: 1024px) {
 
             .dashboard-grid,
             .profile-grid {
                 grid-template-columns: 1fr;
+            }
+        }
+
+        /* ---- Mobil ---- */
+        @media (max-width: 640px) {
+            .dashboard-container {
+                padding: 20px 14px;
+            }
+
+            .topbar {
+                flex-wrap: wrap;
+                gap: 12px;
+                margin-bottom: 24px;
+            }
+
+            .logo {
+                font-size: 1.7rem;
+            }
+
+            .grid-card {
+                padding: 20px 16px;
+                border-radius: 18px;
+            }
+
+            /* Baslik ve yanindaki aciklama dar ekranda yan yana sikisiyor */
+            .grid-card h3 {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+                font-size: 1.15rem;
+                margin-bottom: 18px;
+            }
+
+            .stat-card {
+                padding: 18px;
+                border-radius: 16px;
+            }
+
+            .stat-value {
+                font-size: 1.8rem;
+            }
+
+            /* Sabit minimum genişlikler dar ekranda taşmaya yol açar */
+            .summary-grid,
+            .aso-meta-grid,
+            .trending-grid,
+            .compare-grid {
+                grid-template-columns: 1fr;
+                gap: 14px;
+            }
+
+            /* 10 bölümlük menü sarmalandığında ekranın yarısını yiyor;
+               mobilde yatay kaydırılabilir tek satır daha kullanışlı */
+            .nav-menu {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+                gap: 6px;
+            }
+
+            .nav-menu::-webkit-scrollbar {
+                display: none;
+            }
+
+            .nav-menu a,
+            .nav-menu .export-btn {
+                flex: 0 0 auto;
+                white-space: nowrap;
+                font-size: 0.82rem;
+                padding: 7px 12px;
+            }
+
+            .nav-menu .export-btn {
+                margin-left: 0;
+            }
+
+            .profile-details p {
+                flex-direction: column;
+                gap: 2px;
+            }
+
+            .profile-details p strong {
+                flex: none;
+            }
+
+            .aso-keyword-grid {
+                gap: 20px;
+            }
+
+            .reviews-table th,
+            .reviews-table td {
+                padding: 10px 8px;
+                font-size: 0.85rem;
             }
         }
 

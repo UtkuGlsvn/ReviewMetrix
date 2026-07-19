@@ -729,6 +729,11 @@ ASO_GENERIC_WORDS = {
     'someone', 'people', 'guys', 'ever', 'always', 'maybe', 'actually',
     'pretty', 'quite', 'very', 'super', 'awesome', 'nice', 'amazing', 'love',
     'hate', 'bad', 'worst', 'better', 'well', 'yet', 'though', 'however',
+    # Saf degerlendirme sifatlari: POS etiketleyici bunlari baglamsiz kullanimda
+    # bazen isim sanir, ama hicbir arama niyeti tasimazlar
+    'excellent', 'cool', 'perfect', 'fantastic', 'wonderful', 'terrible',
+    'horrible', 'useless', 'annoying', 'disappointing', 'poor', 'decent',
+    'okay', 'fine', 'ok', 'meh', 'garbage', 'trash', 'crap', 'stupid',
 }
 
 # Bigram'lar tek kelimelerden daha spesifik ASO sinyali taşır ("offline mode",

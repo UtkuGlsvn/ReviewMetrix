@@ -285,11 +285,99 @@
             margin-top: 12px;
         }
 
+        /* Grid cocuklari icerikten dar olamazsa (min-width: auto) genis ApexCharts
+           SVG'si track'i sisirip sayfayi yana kaydiriyor */
+        .grid-card,
+        .vs-app,
+        .metrics-card {
+            min-width: 0;
+        }
+
+        .grid-card svg,
+        .apexcharts-canvas {
+            max-width: 100% !important;
+        }
+
         @media (max-width: 1024px) {
 
             .chart-grid,
             .kw-columns {
                 grid-template-columns: 1fr;
+            }
+        }
+
+        /* ---- Mobil ---- */
+        @media (max-width: 640px) {
+            .dashboard-container {
+                padding: 20px 14px;
+            }
+
+            .topbar {
+                flex-wrap: wrap;
+                gap: 12px;
+            }
+
+            .logo {
+                font-size: 1.7rem;
+            }
+
+            .grid-card {
+                padding: 20px 16px;
+            }
+
+            .metrics-card {
+                padding: 16px 18px;
+            }
+
+            /* VS basligi: iki uygulama alt alta, rozet ortada */
+            .vs-header {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .vs-badge {
+                margin: 0 auto;
+                width: 44px;
+                height: 44px;
+                font-size: 1.2rem;
+            }
+
+            .vs-app {
+                padding: 16px;
+            }
+
+            .vs-app h2 {
+                font-size: 1.2rem;
+            }
+
+            /* Karsilastirma satiri dar ekranda 3 kolona sigmiyor: etiket ustte,
+               iki deger altta yan yana. Degerler kendi sutunlarinda ORTALANIR —
+               aksi halde sag/sol hizali olduklari icin ortada birlesip tek bir
+               sayi gibi okunuyorlar ("4.56" + "4.32" -> "4.564.32"). */
+            .metric-row {
+                grid-template-columns: 1fr 1fr;
+                row-gap: 6px;
+                column-gap: 14px;
+                padding: 14px 0;
+            }
+
+            .metric-label {
+                grid-column: 1 / -1;
+                order: -1;
+                text-align: left;
+                font-size: 0.72rem;
+            }
+
+            .metric-val,
+            .metric-val.a,
+            .metric-val.b {
+                text-align: center;
+                font-size: 1.35rem;
+            }
+
+            /* Iki degeri gorsel olarak ayiran ince cizgi */
+            .metric-val.b {
+                border-left: 1px solid rgba(255, 255, 255, 0.08);
             }
         }
 
