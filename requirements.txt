@@ -6,3 +6,4 @@ matplotlib
 textblob
 google-play-scraper
 app-store-scraper
+gunicorn

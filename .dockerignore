@@ -1,0 +1,15 @@
+.git
+.gitignore
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+tests/
+pytest.ini
+requirements-dev.txt
+img/
+README.md
+Dockerfile
+.dockerignore
+*.log
+.DS_Store

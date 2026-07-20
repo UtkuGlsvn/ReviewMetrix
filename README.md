@@ -144,6 +144,32 @@ Available at <http://127.0.0.1:4999>.
 | `FLASK_DEBUG` | `0` | Set to `1` for the interactive debugger. Leave off outside local development. |
 | `PORT` | `4999` | Port to bind. |
 
+`run.py` uses the Werkzeug development server. For anything beyond local use,
+serve the same `run:app` entrypoint with gunicorn:
+
+```bash
+gunicorn run:app --bind 0.0.0.0:8000 --workers 2 --threads 4 --timeout 180
+```
+
+Scraping is I/O-bound and slow, so threads buy more than processes here. The
+long timeout is deliberate: a six-country comparison performs six sequential
+scrapes and would be killed by gunicorn's 30-second default.
+
+### Docker
+
+```bash
+docker build -t reviewmetrix .
+docker run -p 8000:8000 reviewmetrix
+```
+
+The image pre-downloads the NLTK corpora at build time by calling the app's own
+downloader, so the container does not reach out on its first request, and it
+runs as a non-root user.
+
+> The review cache lives in process memory, so each gunicorn worker keeps its
+> own copy. More workers means more cache misses. A shared store such as Redis
+> would be needed to fix that properly.
+
 ---
 
 ## Usage
@@ -201,6 +227,7 @@ so sort direction is actually asserted, rather than passing vacuously.
 | Charts | ApexCharts, Matplotlib, WordCloud |
 | Scraping | `google-play-scraper`, `app-store-scraper`, iTunes Search API |
 | Testing | pytest |
+| Serving | gunicorn, Docker |
 
 ---
 
