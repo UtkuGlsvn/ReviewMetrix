@@ -52,8 +52,11 @@ def test_analyze_renders_full_dashboard(client, patched_fetch):
 
     # Ana bölümlerin hepsi render olmalı
     for marker in ['Reviews Scraped', 'Complaints Filtered', 'Platform Comparison',
-                   'Rating Distribution', 'Complaint Themes', 'Save as PDF']:
+                   'Rating Distribution', 'Complaint Themes']:
         assert marker in body, f'eksik bölüm: {marker}'
+    # Disa aktarma eylemleri (etiketler kisa, islevi onclick belirler)
+    assert 'window.print()' in body, 'PDF disa aktarma butonu eksik'
+    assert 'exportReviewsCSV()' in body, 'CSV disa aktarma butonu eksik'
     assert 'unexpected error occurred' not in body
 
 

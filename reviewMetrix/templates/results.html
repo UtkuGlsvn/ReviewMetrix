@@ -144,10 +144,13 @@
             margin: 0;
         }
 
+        /* Alt metni kartın dibine sabitler; böylece alt metin sarsa bile
+           tüm kartlarda değerler aynı hizada durur */
         .stat-sub {
             font-size: 0.85rem;
             color: var(--text-secondary);
-            margin-top: 8px;
+            margin-top: auto;
+            padding-top: 8px;
         }
 
         /* Main Dashboard Grid */
@@ -301,7 +304,9 @@
             top: 0;
             z-index: 100;
             display: flex;
-            flex-wrap: wrap;
+            /* Tek satır: linkler gerekirse kendi içinde kayar, eylemler sağda sabit kalır */
+            flex-wrap: nowrap;
+            align-items: center;
             gap: 8px;
             padding: 14px 0;
             margin-bottom: 30px;
@@ -328,13 +333,46 @@
             border-color: var(--card-border);
         }
 
+        /* Bölüm linkleri sola, eylemler sağa; ikisi ayrı gruplar hâlinde */
+        .nav-links {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 4px;
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .nav-links::-webkit-scrollbar {
+            display: none;
+        }
+
+        .nav-links a {
+            flex: 0 0 auto;
+            white-space: nowrap;
+        }
+
+        .nav-actions {
+            display: flex;
+            gap: 8px;
+            flex: 0 0 auto;
+            padding-left: 12px;
+            border-left: 1px solid var(--card-border);
+        }
+
         .nav-menu .export-btn {
-            margin-left: auto;
             color: var(--accent-primary);
             border: 1px solid rgba(139, 92, 246, 0.3);
             background: rgba(139, 92, 246, 0.08);
             cursor: pointer;
             font-family: var(--font-family);
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 8px 14px;
+            border-radius: 10px;
+            white-space: nowrap;
+            transition: all 0.2s;
         }
 
         .nav-menu .export-btn:hover {
@@ -926,30 +964,39 @@
                 gap: 14px;
             }
 
-            /* 10 bölümlük menü sarmalandığında ekranın yarısını yiyor;
-               mobilde yatay kaydırılabilir tek satır daha kullanışlı */
+            /* Bölüm linkleri sarmalandığında ekranın yarısını yiyor; mobilde
+               yatay kaydırılabilir tek satır olsun, eylemler sabit kalsın */
             .nav-menu {
+                flex-wrap: nowrap;
+                gap: 8px;
+            }
+
+            .nav-links {
                 flex-wrap: nowrap;
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
                 scrollbar-width: none;
-                gap: 6px;
             }
 
-            .nav-menu::-webkit-scrollbar {
+            .nav-links::-webkit-scrollbar {
                 display: none;
             }
 
-            .nav-menu a,
-            .nav-menu .export-btn {
+            .nav-links a {
                 flex: 0 0 auto;
                 white-space: nowrap;
                 font-size: 0.82rem;
                 padding: 7px 12px;
             }
 
+            .nav-actions {
+                padding-left: 8px;
+                gap: 6px;
+            }
+
             .nav-menu .export-btn {
-                margin-left: 0;
+                font-size: 0.78rem;
+                padding: 7px 10px;
             }
 
             .profile-details p {
@@ -1040,20 +1087,26 @@
         </div>
         {% else %}
         <nav class="nav-menu">
-            <a href="#overview">Overview</a>
-            {% if momentum and momentum.available %}<a href="#momentum">Momentum</a>{% endif %}
-            {% if platform_comparison %}<a href="#compare">Platforms</a>{% endif %}
-            {% if rating_distribution %}<a href="#distribution">Ratings</a>{% endif %}
-            {% if themes %}<a href="#themes">Themes</a>{% endif %}
-            {% if emerging_keywords and emerging_keywords.keywords %}<a href="#trending">Trending</a>{% endif %}
-            {% if responses and responses.available %}<a href="#responses">Replies</a>{% endif %}
-            {% if aso and aso.available %}<a href="#aso">ASO</a>{% endif %}
-            {% if version_breakdown %}<a href="#versions">Versions</a>{% endif %}
-            <a href="#trends">Trends</a>
-            <a href="#keywords">Keywords</a>
-            <a href="#reviews">Reviews</a>
-            {% if sample_reviews %}<button type="button" class="export-btn" onclick="exportReviewsCSV()">⬇ Export CSV</button>{% endif %}
-            <button type="button" class="export-btn" onclick="window.print()">🖨️ Save as PDF</button>
+            <div class="nav-links">
+                <a href="#overview">Overview</a>
+                {% if momentum and momentum.available %}<a href="#momentum">Momentum</a>{% endif %}
+                {% if platform_comparison %}<a href="#compare">Platforms</a>{% endif %}
+                {% if rating_distribution %}<a href="#distribution">Ratings</a>{% endif %}
+                {% if themes %}<a href="#themes">Themes</a>{% endif %}
+                {% if emerging_keywords and emerging_keywords.keywords %}<a href="#trending">Trending</a>{% endif %}
+                {% if responses and responses.available %}<a href="#responses">Replies</a>{% endif %}
+                {% if aso and aso.available %}<a href="#aso">ASO</a>{% endif %}
+                {% if version_breakdown %}<a href="#versions">Versions</a>{% endif %}
+                <a href="#trends">Trends</a>
+                <a href="#keywords">Keywords</a>
+                <a href="#reviews">Reviews</a>
+            </div>
+            <div class="nav-actions">
+                {% if sample_reviews %}<button type="button" class="export-btn" onclick="exportReviewsCSV()"
+                    title="Download the filtered complaints as CSV">↓ CSV</button>{% endif %}
+                <button type="button" class="export-btn" onclick="window.print()"
+                    title="Save this report as PDF">↓ PDF</button>
+            </div>
         </nav>
 
         {% if sentiment_available is defined and not sentiment_available %}
@@ -1102,14 +1155,14 @@
             <div class="stat-card">
                 <span class="stat-label">Complaints Filtered</span>
                 <p class="stat-value" style="color: var(--accent-secondary);">{{ complaint_count }}</p>
-                <span class="stat-sub">Reviews with rating ≤ complaint threshold</span>
+                <span class="stat-sub">Rating ≤ your complaint threshold</span>
             </div>
         </div>
 
         <div class="profile-grid">
             {% if summary_stats and summary_stats.google %}
             <div class="grid-card">
-                <h3 style="color: #60a5fa; margin-bottom: 15px;">🤖 Google Play Details</h3>
+                <h3 style="margin-bottom: 15px;"><span class="platform-tag google">Google Play</span></h3>
                 <div class="profile-details">
                     <p><strong>App Name:</strong> <span>{{ summary_stats.google.title }}</span></p>
                     <p><strong>Developer:</strong> <span>{{ summary_stats.google.developer }}</span></p>
@@ -1126,7 +1179,7 @@
 
             {% if summary_stats and summary_stats.ios %}
             <div class="grid-card">
-                <h3 style="color: #f472b6; margin-bottom: 15px;">🍎 App Store Details</h3>
+                <h3 style="margin-bottom: 15px;"><span class="platform-tag ios">App Store</span></h3>
                 <div class="profile-details">
                     <p><strong>App Name:</strong> <span>{{ summary_stats.ios.title }}</span></p>
                     <p><strong>Developer:</strong> <span>{{ summary_stats.ios.developer }}</span></p>
