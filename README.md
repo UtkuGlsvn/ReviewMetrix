@@ -16,20 +16,33 @@ gaps.
 
 ## Features
 
+The report is split into four tabs — **Overview**, **Issues**, **ASO** and
+**Trends & Reviews** — so each view stays readable instead of forming one very
+long scroll. Issues and ASO show a count badge, and PDF export covers the open
+tab only.
+
 ### Analysis
 
 - **Dual-platform scraping** — Google Play and App Store in one run, merged into a single dataset with a `platform` column.
 - **Complaint filtering** — analyze only reviews at or below a score threshold (e.g. ≤ 2 stars).
+- **Rating momentum** — the store only ever shows the lifetime average, where millions of old reviews can hide a present-day collapse. This compares it against the scraped window and labels the gap. On Spotify: 4.34 lifetime vs 3.81 across the last 200 reviews.
+- **Fix First prioritization** — themes ranked by `(complaints + likes) × severity` rather than raw count, where severity is `5 − average rating`. A theme with two complaints, eight likes and a 1.0 average outranks one with seven mild complaints.
 - **Rating distribution** — 1–5 star breakdown, overall and per platform.
 - **Complaint themes** — reviews are auto-categorized into 10 buckets (Crashes & Bugs, Performance, Ads, Login & Account, Price & Payment, UI & UX, Updates, Notifications, Customer Support, Privacy).
 - **Sentiment analysis** — polarity per review, aggregated into positive/neutral/negative and plotted over time.
 - **Trending complaints** — splits complaints chronologically and surfaces keywords rising in the newer half, flagging ones that are entirely new. Useful for catching a regression early.
-- **Version breakdown** — complaints grouped by app version with average rating and sentiment, to spot which release caused a spike (Google Play only; the App Store scraper does not expose review versions).
+- **Developer responses** — reply rate overall and specifically on complaints, median reply time, and a per-theme breakdown sorted worst-first so ignored themes surface. The complaint-specific rate is the meaningful one: an app can look responsive while only answering its praise.
+- **Version breakdown** — complaints grouped by app version with average rating and sentiment, to spot which release caused a spike.
 - **Word cloud and top keywords** — classic frequency view of complaint vocabulary.
+
+Review likes (`thumbsUpCount`) are treated as additional affected users: they
+feed the priority score and sort the review table, so the complaint the most
+people endorsed appears first.
 
 ### Comparison
 
 - **Competitor comparison** (`/compare`) — two apps side by side: ratings, complaint share, sentiment, theme distribution (as % of complaints), rating distribution and keyword lists.
+- **Competitor ASO gap** — splits listing vocabulary into "they target, you don't" and "you target, they don't". Brand and developer names are excluded; they are not transferable keywords.
 - **Multi-country comparison** (`/compare-countries`) — the same app across up to 6 markets, with per-country cards and charts for rating, complaint volume and sentiment.
 
 ### ASO (App Store Optimization)
@@ -60,8 +73,8 @@ themes, keywords and trends remain available.
 ### Performance and export
 
 - **TTL cache** — scraping results are cached in memory for one hour, keyed by app, country, language and review count (32-entry LRU). Measured on live data: a single app goes 2.42s → 0.22s, a 3-country comparison 6.25s → 0.53s. Empty results are never cached, so a transient scraper failure is not pinned. A **Force refresh** checkbox bypasses the cache.
-- **CSV export** of the filtered complaints.
-- **PDF export** — a print stylesheet on every report page (white background, chrome hidden, page-break handling); use *Save as PDF*.
+- **CSV export** of the filtered complaints, including likes.
+- **PDF export** — scoped to the open tab, via a print stylesheet (white background, chrome hidden, page-break handling) plus a header carrying the section name, app title and review counts. Charts render lazily per tab, so a tab must be opened before it can be printed.
 - **Quick presets** for nine popular apps, plus an optional date-range filter.
 
 ---
@@ -164,13 +177,15 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-147 tests covering:
+194 tests covering:
 
 - `tests/test_analyzer.py` — rating distribution, theme categorization, platform comparison, date-range filtering, trending keywords, version breakdown, sentiment, preprocessing, and the `build_app_report` pipeline including every error branch.
 - `tests/test_routes.py` — all four routes, error paths, the date-filter badge, country de-duplication and the 6-country cap, and partial failures where one app or market returns no data.
 - `tests/test_cache.py` — cache hit/miss, TTL expiry, force refresh, empty results not cached, mutation isolation, LRU eviction order, and route-level caching.
 - `tests/test_multilingual.py` — per-language sentiment and themes, negation handling, and the UI degradation for unsupported languages.
 - `tests/test_aso.py` — listing health thresholds, keyword gap, phrase detection, noise filtering, and graceful fallback without the POS tagger.
+- `tests/test_priorities.py` — momentum thresholds and per-platform scoping, priority ranking against raw volume, likes as affected users, and review ordering.
+- `tests/test_responses.py` — reply rates, median reply time, per-theme gaps, competitor keyword gap, and the POS context fix.
 
 Test data is deliberately discriminating — ordering fixtures use unequal counts
 so sort direction is actually asserted, rather than passing vacuously.
@@ -191,7 +206,8 @@ so sort direction is actually asserted, rather than passing vacuously.
 
 ## Known Limitations
 
-- **App Store scraping is fragile.** `app-store-scraper` breaks when Apple changes its endpoints, and it does not expose the app version per review, so the version breakdown is Google Play only. Review fetching failures are caught, so the rest of the report still renders.
+- **Several signals are Google Play only.** The App Store scraper exposes neither the app version per review, nor review likes, nor developer replies — so the version breakdown, likes weighting and response analysis cover Google Play alone, and the UI labels them as such. Ratings, themes, sentiment and keywords use both stores.
+- **App Store scraping is fragile.** `app-store-scraper` breaks when Apple changes its endpoints. Review fetching failures are caught, so the rest of the report still renders.
 - **Sentiment outside English is lexicon-based.** It handles clearly polar wording and negation, but factual complaints with no polar words score 0.00. It is not a transformer model, and accuracy expectations should be set accordingly.
 - **The cache is per-process.** Running multiple workers gives each its own cache; a shared store (e.g. Redis) would be needed for a real deployment.
 - **The dev server is not production-ready.** Use a WSGI server such as gunicorn behind a reverse proxy.
