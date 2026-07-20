@@ -185,6 +185,75 @@
             grid-column: 1 / -1;
         }
 
+        /* Info tooltip on section headings */
+        .h3-label {
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .tip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 17px;
+            height: 17px;
+            margin-left: 9px;
+            border-radius: 50%;
+            border: 1px solid var(--card-border);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            font-family: var(--font-family);
+            font-size: 0.72rem;
+            font-weight: 700;
+            cursor: help;
+            position: relative;
+            flex: 0 0 auto;
+        }
+
+        .tip:hover {
+            color: var(--text-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .tip::after {
+            content: attr(data-tip);
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: max-content;
+            max-width: 270px;
+            background: #0b0f19;
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            padding: 11px 13px;
+            border-radius: 10px;
+            font-size: 0.78rem;
+            font-weight: 400;
+            line-height: 1.5;
+            text-align: left;
+            letter-spacing: normal;
+            text-transform: none;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s;
+            z-index: 200;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+            pointer-events: none;
+        }
+
+        .tip:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Do not print the tooltip icons */
+        @media print {
+            .tip {
+                display: none;
+            }
+        }
+
         /* App Profile Details Styling */
         .profile-grid {
             display: grid;
@@ -1275,7 +1344,7 @@
         {% if momentum and momentum.available %}
         <div id="momentum" class="section-anchor"></div>
         <div class="grid-card full-width-card" style="margin-bottom: 30px;">
-            <h3>📉 Rating Momentum
+            <h3><span class="h3-label">📉 Rating Momentum <span class="tip" data-tip="The store shows a lifetime average that can hide a recent drop. This compares it against the reviews you just scraped.">?</span></span>
                 <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">
                     lifetime store average vs. the reviews scraped now
                 </span>
@@ -1324,7 +1393,7 @@
         {% if platform_comparison %}
         <div id="compare" class="section-anchor"></div>
         <div class="grid-card full-width-card" style="margin-bottom: 30px;">
-            <h3>⚔️ Platform Comparison <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 400;">(based on scraped reviews)</span></h3>
+            <h3><span class="h3-label">⚔️ Platform Comparison  <span class="tip" data-tip="Average rating and sentiment on each store, from the scraped reviews. Reveals problems specific to Android or iOS.">?</span></span><span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 400;">(based on scraped reviews)</span></h3>
             <div class="compare-grid">
                 {% for p in platform_comparison %}
                 <div class="compare-card">
@@ -1345,7 +1414,7 @@
         {% if rating_distribution %}
         <div class="dashboard-grid">
             <div class="grid-card">
-                <h3>⭐ Rating Distribution</h3>
+                <h3><span class="h3-label">⭐ Rating Distribution <span class="tip" data-tip="How the scraped reviews split across 1 to 5 stars. A U-shape (many 1s and 5s) tells a different story than the average alone.">?</span></span></h3>
                 <div id="ratingDistChart"></div>
             </div>
         </div>
@@ -1356,7 +1425,7 @@
         {% if themes %}
         <div class="dashboard-grid">
             <div class="grid-card">
-                <h3>🏷️ Complaint Themes</h3>
+                <h3><span class="h3-label">🏷️ Complaint Themes <span class="tip" data-tip="Complaints auto-grouped into 10 categories by keyword, so you see what people complain about most.">?</span></span></h3>
                 <div id="themesChart"></div>
             </div>
         </div>
@@ -1364,7 +1433,7 @@
 
         {% if themes %}
         <div class="grid-card full-width-card" style="margin-bottom: 30px;">
-            <h3>🔧 Fix First — Prioritized Issues
+            <h3><span class="h3-label">🔧 Fix First — Prioritized Issues <span class="tip" data-tip="Themes ranked by (complaints + likes) times severity, not raw count. A few harsh, highly-liked complaints outrank many mild ones.">?</span></span>
                 <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">
                     priority = (complaints + likes) × severity
                 </span>
@@ -1416,7 +1485,7 @@
         {% if emerging_keywords and emerging_keywords.keywords %}
         <div id="trending" class="section-anchor"></div>
         <div class="grid-card full-width-card" style="margin-bottom: 30px;">
-            <h3>📈 Trending Complaints
+            <h3><span class="h3-label">📈 Trending Complaints <span class="tip" data-tip="Words rising in the newer half of the complaints. A NEW badge means it was absent before, which often signals a regression.">?</span></span>
                 <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 400;">
                     rising in the newer half ({{ emerging_keywords.recent_count }} recent vs {{ emerging_keywords.previous_count }} older complaints{% if emerging_keywords.split_date %}, split @ {{ emerging_keywords.split_date }}{% endif %})
                 </span>
@@ -1441,7 +1510,7 @@
         {% if responses and responses.available %}
         <div id="responses" class="section-anchor"></div>
         <div class="grid-card full-width-card" style="margin-bottom: 30px;">
-            <h3>💬 Developer Responses
+            <h3><span class="h3-label">💬 Developer Responses <span class="tip" data-tip="Reply rate, median reply time and which themes go unanswered. The rate on complaints matters more than the overall one. Google Play only.">?</span></span>
                 <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">Google Play only</span>
             </h3>
 
@@ -1504,7 +1573,7 @@
         <section class="tab-panel" id="panel-aso" data-panel="aso">
         {% if aso and aso.available %}
         <div class="grid-card full-width-card" style="margin-bottom: 30px;">
-            <h3>🔍 ASO — Store Listing Optimization
+            <h3><span class="h3-label">🔍 ASO — Store Listing Optimization <span class="tip" data-tip="Compares your listing text against the words users actually use. Surfaces keywords users say but your listing never mentions.">?</span></span>
                 <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">
                     based on {{ aso.reviews_analyzed }} reviews vs. the store listing
                 </span>
@@ -1578,7 +1647,7 @@
         {% if version_breakdown %}
         <div class="dashboard-grid">
             <div class="grid-card">
-                <h3>📦 Complaints by App Version
+                <h3><span class="h3-label">📦 Complaints by App Version <span class="tip" data-tip="Complaints grouped by app version, to spot which release caused a spike. Google Play only.">?</span></span>
                     <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">Google Play only</span>
                 </h3>
                 <div id="versionChart"></div>
@@ -1624,13 +1693,13 @@
         <div id="trends" class="section-anchor"></div>
         <div class="dashboard-grid">
             <div class="grid-card">
-                <h3>Rating & Sentiment Trend Over Time</h3>
+                <h3><span class="h3-label">Rating & Sentiment Trend Over Time <span class="tip" data-tip="Average rating and sentiment plotted over time, so you can see when things changed.">?</span></span></h3>
                 <div id="trendChart"></div>
             </div>
 
             {% if sentiment_available is not defined or sentiment_available %}
             <div class="grid-card">
-                <h3>Sentiment Analysis</h3>
+                <h3><span class="h3-label">Sentiment Analysis <span class="tip" data-tip="How the complaints split into positive, neutral and negative.">?</span></span></h3>
                 <div id="sentimentChart"></div>
                 {% if sentiment_summary %}
                 <p style="font-size: 0.9rem; text-align: center; color: var(--text-secondary); margin-top: 15px;">
@@ -1643,7 +1712,7 @@
 
             <div id="keywords" class="section-anchor"></div>
             <div class="grid-card">
-                <h3>Top Complaint Keywords</h3>
+                <h3><span class="h3-label">Top Complaint Keywords <span class="tip" data-tip="The most frequent words across the complaint text.">?</span></span></h3>
                 <div id="keywordChart"></div>
             </div>
 
@@ -1656,7 +1725,7 @@
 
             <div id="reviews" class="section-anchor"></div>
             <div class="grid-card full-width-card">
-                <h3>Recent Filtered Complaints</h3>
+                <h3><span class="h3-label">Recent Filtered Complaints <span class="tip" data-tip="The raw complaints, most-liked first. A like is another user endorsing the same problem.">?</span></span></h3>
                 <div class="reviews-table-wrapper">
                     <table class="reviews-table" id="reviewsTable">
                         <thead>

@@ -236,7 +236,7 @@ def test_unsupported_language_shows_notice_and_hides_sentiment(client, patched_f
 
     assert resp.status_code == 200
     assert 'Sentiment analysis unavailable' in body
-    assert '<h3>Sentiment Analysis</h3>' not in body
+    assert 'Sentiment Analysis' not in body
     assert 'Average Sentiment Polarity' not in body
 
 
@@ -245,4 +245,4 @@ def test_supported_language_shows_sentiment_sections(client, patched_fetch):
     body = resp.data.decode()
 
     assert 'Sentiment analysis unavailable' not in body
-    assert '<h3>Sentiment Analysis</h3>' in body
+    assert 'Sentiment Analysis' in body
