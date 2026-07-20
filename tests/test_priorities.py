@@ -244,7 +244,9 @@ def test_results_page_renders_momentum_and_priorities(client, patched_fetch):
     body = resp.data.decode()
 
     assert resp.status_code == 200
+    # Momentum genel bakis sekmesinde, oncelik tablosu ise Issues sekmesinde
     assert 'Rating Momentum' in body
-    assert 'href="#momentum"' in body
+    assert 'data-panel="overview"' in body
     assert 'Fix First' in body
     assert 'Users affected' in body
+    assert 'data-tab="issues"' in body

@@ -316,21 +316,54 @@
             border-bottom: 1px solid var(--card-border);
         }
 
-        .nav-menu a {
+        .tab-btn {
             color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 0.9rem;
+            background: transparent;
+            font-family: var(--font-family);
+            font-size: 0.92rem;
             font-weight: 600;
-            padding: 8px 16px;
+            padding: 9px 18px;
             border-radius: 10px;
             transition: all 0.2s;
             border: 1px solid transparent;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
         }
 
-        .nav-menu a:hover {
+        .tab-btn:hover {
             color: var(--text-primary);
             background: rgba(255, 255, 255, 0.05);
-            border-color: var(--card-border);
+        }
+
+        .tab-btn.is-active {
+            color: var(--text-primary);
+            background: rgba(139, 92, 246, 0.14);
+            border-color: rgba(139, 92, 246, 0.35);
+        }
+
+        .tab-count {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 20px;
+        }
+
+        .tab-btn.is-active .tab-count {
+            background: rgba(139, 92, 246, 0.3);
+            color: var(--text-primary);
+        }
+
+        /* Yalnızca aktif sekme görünür — PDF de bu sayede tek sekme alır */
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.is-active {
+            display: block;
         }
 
         /* Bölüm linkleri sola, eylemler sağa; ikisi ayrı gruplar hâlinde */
@@ -348,7 +381,7 @@
             display: none;
         }
 
-        .nav-links a {
+        .nav-links .tab-btn {
             flex: 0 0 auto;
             white-space: nowrap;
         }
@@ -982,7 +1015,7 @@
                 display: none;
             }
 
-            .nav-links a {
+            .nav-links .tab-btn {
                 flex: 0 0 auto;
                 white-space: nowrap;
                 font-size: 0.82rem;
@@ -1019,10 +1052,44 @@
             }
         }
 
-        /* ---- Print / PDF export ---- */
+        /* Yazdırma başlığı yalnızca baskıda görünür */
+        .print-only {
+            display: none;
+        }
+
+        /* ---- Print / PDF export ----
+           PDF yalnızca AÇIK sekmeyi alır: pasif paneller zaten display:none
+           olduğundan baskıya girmez. Bu kural niyeti açık hâle getirir. */
         @media print {
             @page {
                 margin: 12mm;
+            }
+
+            .tab-panel {
+                display: none !important;
+            }
+
+            .tab-panel.is-active {
+                display: block !important;
+            }
+
+            .print-only {
+                display: block;
+                margin-bottom: 16px;
+                padding-bottom: 10px;
+                border-bottom: 1px solid #d1d5db;
+                color: #111827 !important;
+            }
+
+            .print-only .print-section {
+                font-family: 'Outfit', sans-serif;
+                font-size: 1.1rem;
+                font-weight: 700;
+            }
+
+            .print-only .print-meta {
+                font-size: 0.8rem;
+                color: #6b7280 !important;
             }
 
             body {
@@ -1087,19 +1154,21 @@
         </div>
         {% else %}
         <nav class="nav-menu">
-            <div class="nav-links">
-                <a href="#overview">Overview</a>
-                {% if momentum and momentum.available %}<a href="#momentum">Momentum</a>{% endif %}
-                {% if platform_comparison %}<a href="#compare">Platforms</a>{% endif %}
-                {% if rating_distribution %}<a href="#distribution">Ratings</a>{% endif %}
-                {% if themes %}<a href="#themes">Themes</a>{% endif %}
-                {% if emerging_keywords and emerging_keywords.keywords %}<a href="#trending">Trending</a>{% endif %}
-                {% if responses and responses.available %}<a href="#responses">Replies</a>{% endif %}
-                {% if aso and aso.available %}<a href="#aso">ASO</a>{% endif %}
-                {% if version_breakdown %}<a href="#versions">Versions</a>{% endif %}
-                <a href="#trends">Trends</a>
-                <a href="#keywords">Keywords</a>
-                <a href="#reviews">Reviews</a>
+            <div class="nav-links" role="tablist">
+                <button type="button" class="tab-btn is-active" role="tab" data-tab="overview" aria-selected="true">
+                    Overview
+                </button>
+                <button type="button" class="tab-btn" role="tab" data-tab="issues" aria-selected="false">
+                    Issues{% if themes %} <span class="tab-count">{{ themes|length }}</span>{% endif %}
+                </button>
+                {% if aso and aso.available %}
+                <button type="button" class="tab-btn" role="tab" data-tab="aso" aria-selected="false">
+                    ASO{% if aso.keyword_opportunities %} <span class="tab-count">{{ aso.keyword_opportunities|length }}</span>{% endif %}
+                </button>
+                {% endif %}
+                <button type="button" class="tab-btn" role="tab" data-tab="reviews" aria-selected="false">
+                    Trends &amp; Reviews
+                </button>
             </div>
             <div class="nav-actions">
                 {% if sample_reviews %}<button type="button" class="export-btn" onclick="exportReviewsCSV()"
@@ -1125,7 +1194,15 @@
         </div>
         {% endif %}
 
-        <div id="overview" class="section-anchor"></div>
+        <div class="print-only">
+            <div class="print-section" id="printSection">Overview</div>
+            <div class="print-meta">
+                {% if summary_stats and summary_stats.google %}{{ summary_stats.google.title }}{% elif summary_stats and summary_stats.ios %}{{ summary_stats.ios.title }}{% endif %}
+                — {{ total_reviews }} reviews analyzed, {{ complaint_count }} complaints
+            </div>
+        </div>
+
+        <section class="tab-panel is-active" id="panel-overview" data-panel="overview">
         <div class="summary-grid">
             <div class="stat-card">
                 <span class="stat-label">Google Play Rating</span>
@@ -1264,22 +1341,25 @@
         </div>
         {% endif %}
 
-        <div id="distribution" class="section-anchor"></div>
+        {% if rating_distribution %}
         <div class="dashboard-grid">
-            {% if rating_distribution %}
             <div class="grid-card">
                 <h3>⭐ Rating Distribution</h3>
                 <div id="ratingDistChart"></div>
             </div>
-            {% endif %}
-            {% if themes %}
-            <div id="themes" class="section-anchor"></div>
+        </div>
+        {% endif %}
+        </section><!-- /panel-overview -->
+
+        <section class="tab-panel" id="panel-issues" data-panel="issues">
+        {% if themes %}
+        <div class="dashboard-grid">
             <div class="grid-card">
                 <h3>🏷️ Complaint Themes</h3>
                 <div id="themesChart"></div>
             </div>
-            {% endif %}
         </div>
+        {% endif %}
 
         {% if themes %}
         <div class="grid-card full-width-card" style="margin-bottom: 30px;">
@@ -1418,8 +1498,10 @@
         </div>
         {% endif %}
 
+        </section><!-- /panel-issues -->
+
+        <section class="tab-panel" id="panel-aso" data-panel="aso">
         {% if aso and aso.available %}
-        <div id="aso" class="section-anchor"></div>
         <div class="grid-card full-width-card" style="margin-bottom: 30px;">
             <h3>🔍 ASO — Store Listing Optimization
                 <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">
@@ -1489,8 +1571,10 @@
         </div>
         {% endif %}
 
+        </section><!-- /panel-aso -->
+
+        <section class="tab-panel" id="panel-reviews" data-panel="reviews">
         {% if version_breakdown %}
-        <div id="versions" class="section-anchor"></div>
         <div class="dashboard-grid">
             <div class="grid-card">
                 <h3>📦 Complaints by App Version
@@ -1626,11 +1710,30 @@
                 </div>
             </div>
         </div>
+        </section><!-- /panel-reviews -->
         {% endif %}
     </div>
 
     {% if not error %}
     <script>
+        // Gizli bir kapsayıcıda ApexCharts genişliği 0 olarak ölçer ve bozuk
+        // render eder. Bu yüzden her grafik, ait olduğu sekme ilk kez
+        // görünür olduğunda oluşturulur.
+        const pendingCharts = [];
+
+        function registerChart(panel, factory) {
+            pendingCharts.push({ panel, factory, rendered: false });
+        }
+
+        function renderChartsFor(panel) {
+            pendingCharts
+                .filter(c => c.panel === panel && !c.rendered)
+                .forEach(c => {
+                    c.rendered = true;
+                    try { c.factory(); } catch (e) { console.error('chart render failed', e); }
+                });
+        }
+
         // Set chart options globally for dark theme styling
         const chartThemeOptions = {
             theme: {
@@ -1691,8 +1794,7 @@
                 x: { format: 'dd MMM yyyy' }
             }
         };
-        const trendChart = new ApexCharts(document.querySelector("#trendChart"), trendChartOptions);
-        trendChart.render();
+        registerChart('reviews', () => new ApexCharts(document.querySelector("#trendChart"), trendChartOptions).render());
 
         // 2. Sentiment Donut Chart
         {% if sentiment_summary and (sentiment_available is not defined or sentiment_available) %}
@@ -1722,8 +1824,7 @@
             }
         }]
         };
-        const sentimentChart = new ApexCharts(document.querySelector("#sentimentChart"), sentimentChartOptions);
-        sentimentChart.render();
+        registerChart('reviews', () => new ApexCharts(document.querySelector("#sentimentChart"), sentimentChartOptions).render());
         {% endif %}
 
         // 3. Keywords Horizontal Bar Chart
@@ -1756,8 +1857,7 @@
                 categories: wordCategories
             }
         };
-        const keywordChart = new ApexCharts(document.querySelector("#keywordChart"), keywordChartOptions);
-        keywordChart.render();
+        registerChart('reviews', () => new ApexCharts(document.querySelector("#keywordChart"), keywordChartOptions).render());
         {% endif %}
 
         // 4. Rating Distribution (stacked bar by platform, 1-5 stars)
@@ -1789,7 +1889,7 @@
             xaxis: { categories: starLabels },
             legend: { position: 'top' }
         };
-        new ApexCharts(document.querySelector("#ratingDistChart"), ratingDistOptions).render();
+        registerChart('overview', () => new ApexCharts(document.querySelector("#ratingDistChart"), ratingDistOptions).render());
         {% endif %}
 
         // 5. Complaint Themes (horizontal bar)
@@ -1820,7 +1920,7 @@
                 }
             }
         };
-        new ApexCharts(document.querySelector("#themesChart"), themesOptions).render();
+        registerChart('issues', () => new ApexCharts(document.querySelector("#themesChart"), themesOptions).render());
         {% endif %}
 
         // 6. Complaints by App Version (column chart)
@@ -1844,7 +1944,7 @@
                 }
             }
         };
-        new ApexCharts(document.querySelector("#versionChart"), versionOptions).render();
+        registerChart('reviews', () => new ApexCharts(document.querySelector("#versionChart"), versionOptions).render());
         {% endif %}
 
         // CSV Export of the review table
@@ -1865,14 +1965,50 @@
         window.exportReviewsCSV = exportReviewsCSV;
         {% endif %}
 
-        // Smooth scrolling for the section nav
-        document.querySelectorAll('.nav-menu a[href^="#"]').forEach(a => {
-            a.addEventListener('click', e => {
-                e.preventDefault();
-                const target = document.querySelector(a.getAttribute('href'));
-                if (target) target.scrollIntoView({ behavior: 'smooth' });
+        // ---- Sekme geçişi ----
+        const tabButtons = [...document.querySelectorAll('.tab-btn')];
+        const tabPanels = [...document.querySelectorAll('.tab-panel')];
+
+        function activateTab(name) {
+            tabButtons.forEach(b => {
+                const on = b.dataset.tab === name;
+                b.classList.toggle('is-active', on);
+                b.setAttribute('aria-selected', on ? 'true' : 'false');
             });
-        });
+            tabPanels.forEach(p => p.classList.toggle('is-active', p.dataset.panel === name));
+
+            // Baskı başlığı açık sekmeyi yansıtsın (rozet sayısı hariç)
+            const label = tabButtons.find(b => b.dataset.tab === name);
+            const printSection = document.getElementById('printSection');
+            if (label && printSection) {
+                printSection.textContent = [...label.childNodes]
+                    .filter(n => n.nodeType === Node.TEXT_NODE)
+                    .map(n => n.textContent)
+                    .join('')
+                    .trim();
+            }
+
+            // Panel görünür olduktan sonra grafikleri oluştur ki genişlik doğru ölçülsün
+            renderChartsFor(name);
+
+            // Sekme adresi paylaşılabilir olsun
+            history.replaceState(null, '', '#' + name);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        tabButtons.forEach(b => b.addEventListener('click', () => activateTab(b.dataset.tab)));
+
+        // Açılışta URL'deki sekmeyi (varsa) seç, yoksa varsayılan sekmenin grafiklerini çiz
+        const initial = (location.hash || '').replace('#', '');
+        if (initial && tabButtons.some(b => b.dataset.tab === initial)) {
+            activateTab(initial);
+        } else {
+            renderChartsFor('overview');
+        }
+
+        // Yazdırma yalnızca açık sekmeyi alır (gizli paneller display:none).
+        // Grafiklerin baskıda boş çıkmaması için yazdırmadan önce yeniden boyutlandır.
+        window.addEventListener('beforeprint', () => window.dispatchEvent(new Event('resize')));
     </script>
     {% endif %}
 </body>

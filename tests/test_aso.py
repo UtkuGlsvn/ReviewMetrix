@@ -253,4 +253,6 @@ def test_results_page_renders_aso_section(client, patched_fetch):
     assert resp.status_code == 200
     assert 'ASO — Store Listing Optimization' in body
     assert 'Keyword opportunities' in body
-    assert 'href="#aso"' in body
+    # ASO kendi sekmesinde yer alir
+    assert 'data-tab="aso"' in body
+    assert 'data-panel="aso"' in body
