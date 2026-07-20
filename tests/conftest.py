@@ -64,16 +64,21 @@ def reviews_df():
 
 @pytest.fixture
 def summary_stats():
+    # description_full ASO ve rakip listeleme analizinin kullandigi alandir;
+    # gercek veride her zaman bulunur
+    google_desc = 'A mock app for listening to music, podcasts and audiobooks offline.'
+    ios_desc = 'A mock app with playlists, radio stations and offline downloads.'
     return {
         'google': {
             'rating': 4.2, 'reviews': 1000, 'title': 'MockApp', 'developer': 'MockDev',
             'category': 'Social', 'installs': '1B+', 'version': '5.1',
-            'released': '2015', 'description': 'A mock app',
+            'released': '2015', 'description': google_desc[:200],
+            'description_full': google_desc,
         },
         'ios': {
             'rating': 4.6, 'reviews': 500, 'title': 'MockApp', 'developer': 'MockDev',
             'category': 'Social', 'version': '5.1', 'released': '2015-01-01',
-            'description': 'A mock app',
+            'description': ios_desc[:200], 'description_full': ios_desc,
         },
     }
 

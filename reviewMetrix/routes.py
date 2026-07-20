@@ -59,6 +59,7 @@ def analyze_reviews():
             lang_code=report['lang_code'],
             aso=report['aso'],
             momentum=report['momentum'],
+            responses=report['responses'],
         )
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -88,7 +89,12 @@ def compare_apps():
             params['start_date'], params['end_date'], params['force_refresh'],
         )
 
-        return render_template('compare.html', app_a=app_a, app_b=app_b)
+        keyword_gap = analyzer.get_competitor_keyword_gap(
+            app_a['summary_stats'], app_b['summary_stats'], params['language']
+        )
+
+        return render_template('compare.html', app_a=app_a, app_b=app_b,
+                               keyword_gap=keyword_gap)
     except Exception as e:
         print(f"A compare error occurred: {e}")
         return render_template('compare.html',

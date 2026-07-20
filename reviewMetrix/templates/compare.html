@@ -275,6 +275,15 @@
             font-family: 'Outfit', sans-serif;
         }
 
+        .col-head em {
+            display: block;
+            font-style: normal;
+            font-weight: 400;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
         .app-warn {
             background: rgba(245, 158, 11, 0.1);
             border: 1px solid rgba(245, 158, 11, 0.2);
@@ -523,6 +532,42 @@
             </span>
             <div id="sentimentCompareChart"></div>
         </div>
+
+        {% if keyword_gap and keyword_gap.available %}
+        <div class="grid-card full" style="margin-bottom: 30px;">
+            <h3>🔍 ASO Listing Gap
+                <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">
+                    {{ keyword_gap.shared }} keywords shared
+                </span>
+            </h3>
+            <div class="kw-columns">
+                <div>
+                    <div class="col-head" style="color: var(--accent-b);">⚠️ {{ app_b.name }} targets — you don’t
+                        <em>keywords missing from your listing</em>
+                    </div>
+                    <ul class="kw-list">
+                        {% for k in keyword_gap.b_only %}
+                        <li><span>{{ k.term }}</span><span class="kw-count" style="color:var(--accent-b)">{{ k.count }}×</span></li>
+                        {% else %}
+                        <li><span style="color:var(--text-secondary)">No gap — you cover everything they target.</span></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div>
+                    <div class="col-head" style="color: var(--accent-a);">✅ You target — {{ app_b.name }} doesn’t
+                        <em>where your listing differentiates</em>
+                    </div>
+                    <ul class="kw-list">
+                        {% for k in keyword_gap.a_only %}
+                        <li><span>{{ k.term }}</span><span class="kw-count" style="color:var(--accent-a)">{{ k.count }}×</span></li>
+                        {% else %}
+                        <li><span style="color:var(--text-secondary)">No unique keywords found.</span></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Keyword lists -->
         <div class="grid-card full">

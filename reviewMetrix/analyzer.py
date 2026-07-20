@@ -44,12 +44,22 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
             if 'thumbsUpCount' in google_df.columns:
                 cols.append('thumbsUpCount')
                 rename['thumbsUpCount'] = 'likes'
+            # Geliştirici yanıtı: itibar yönetimi sinyali
+            if 'replyContent' in google_df.columns:
+                cols.append('replyContent')
+                rename['replyContent'] = 'reply'
+            if 'repliedAt' in google_df.columns:
+                cols.append('repliedAt')
+                rename['repliedAt'] = 'replied_at'
             google_df_renamed = google_df[cols].rename(columns=rename)
             google_df_renamed['platform'] = 'Google Play'
             if 'version' not in google_df_renamed.columns:
                 google_df_renamed['version'] = None
             if 'likes' not in google_df_renamed.columns:
                 google_df_renamed['likes'] = 0
+            for col in ('reply', 'replied_at'):
+                if col not in google_df_renamed.columns:
+                    google_df_renamed[col] = None
             all_dfs.append(google_df_renamed)
         
         gp_details = google_app_details(google_id, lang=lang, country=country)
@@ -103,6 +113,8 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
             apple_df_renamed['platform'] = 'App Store'
             apple_df_renamed['version'] = None  # App Store scraper sürüm bilgisi vermiyor
             apple_df_renamed['likes'] = 0       # App Store beğeni sayısı vermiyor
+            apple_df_renamed['reply'] = None    # App Store geliştirici yanıtı vermiyor
+            apple_df_renamed['replied_at'] = None
             all_dfs.append(apple_df_renamed)
     except Exception as e:  
         print(f"Apple Store fetch review error ->: {e}")
@@ -320,6 +332,154 @@ def get_momentum(summary_stats, all_reviews):
         result['available'] = bool(result['platforms'])
     except Exception as e:
         print(f"Error computing momentum: {e}")
+    return result
+
+
+def get_response_analysis(df, lang_code='en'):
+    """Geliştiricinin yorumlara verdiği yanıtları analiz eder.
+
+    Yanıt oranı ve hızı bir itibar yönetimi sinyalidir; hangi temaların
+    yanıtsız bırakıldığı ise doğrudan aksiyon alınabilir bir boşluktur.
+    Not: yanıt verisi yalnızca Google Play'de mevcuttur.
+    """
+    result = {
+        'available': False,
+        'total': 0,
+        'replied': 0,
+        'response_rate': 0.0,
+        'complaints_total': 0,
+        'complaints_replied': 0,
+        'complaint_response_rate': 0.0,
+        'median_hours': None,
+        'by_theme': [],
+    }
+    if df is None or df.empty or 'reply' not in df.columns:
+        return result
+
+    try:
+        work = df.copy()
+        # Yalnızca yanıt alanını sağlayan platformu değerlendir
+        if 'platform' in work.columns:
+            work = work[work['platform'] == 'Google Play']
+        if work.empty:
+            return result
+
+        has_reply = work['reply'].notna() & (work['reply'].astype(str).str.strip() != '')
+        result['total'] = int(len(work))
+        result['replied'] = int(has_reply.sum())
+        result['response_rate'] = round(result['replied'] * 100 / len(work), 1)
+
+        # Düşük puanlı yorumlarda yanıt oranı daha anlamlı bir göstergedir
+        if 'score' in work.columns:
+            scores = pd.to_numeric(work['score'], errors='coerce')
+            complaint_mask = scores <= 2
+            complaints = work[complaint_mask]
+            if not complaints.empty:
+                c_replied = complaints['reply'].notna() & (complaints['reply'].astype(str).str.strip() != '')
+                result['complaints_total'] = int(len(complaints))
+                result['complaints_replied'] = int(c_replied.sum())
+                result['complaint_response_rate'] = round(
+                    result['complaints_replied'] * 100 / len(complaints), 1)
+
+        # Yanıt süresi (saat)
+        if 'replied_at' in work.columns and result['replied']:
+            replied_rows = work[has_reply]
+            posted = pd.to_datetime(replied_rows['date'], errors='coerce')
+            answered = pd.to_datetime(replied_rows['replied_at'], errors='coerce')
+            for series in (posted, answered):
+                try:
+                    series = series.dt.tz_localize(None)
+                except (TypeError, AttributeError):
+                    pass
+            delta_hours = (answered - posted).dt.total_seconds() / 3600
+            delta_hours = delta_hours.dropna()
+            delta_hours = delta_hours[delta_hours >= 0]
+            if not delta_hours.empty:
+                result['median_hours'] = round(float(delta_hours.median()), 1)
+
+        # Hangi temalar yanıtlanıyor, hangileri görmezden geliniyor?
+        theme_keywords = get_theme_keywords(lang_code)
+        texts = work['review'].fillna('').astype(str).str.lower()
+        by_theme = []
+        for theme, keywords in theme_keywords.items():
+            match = texts.apply(lambda t: any(kw in t for kw in keywords))
+            total = int(match.sum())
+            if total == 0:
+                continue
+            replied = int((match & has_reply).sum())
+            by_theme.append({
+                'theme': theme,
+                'total': total,
+                'replied': replied,
+                'rate': round(replied * 100 / total, 1),
+            })
+        by_theme.sort(key=lambda t: (t['rate'], -t['total']))
+        result['by_theme'] = by_theme
+
+        result['available'] = result['total'] > 0
+    except Exception as e:
+        print(f"Error analyzing developer responses: {e}")
+    return result
+
+
+def get_competitor_keyword_gap(stats_a, stats_b, lang_code='en', top_n=12):
+    """İki uygulamanın mağaza listelemelerini karşılaştırır.
+
+    - b_only: rakibin hedeflediği ama sizde geçmeyen kelimeler (ASO boşluğunuz)
+    - a_only: sizin hedefleyip rakipte olmayan kelimeler (farklılaştığınız alan)
+    """
+    result = {'available': False, 'a_only': [], 'b_only': [], 'shared': 0}
+
+    def listing_counts(stats):
+        parts = []
+        for key in ('google', 'ios'):
+            store = (stats or {}).get(key)
+            if store:
+                parts.append(store.get('title') or '')
+                parts.append(store.get('description_full') or '')
+        text = ' '.join(parts)
+        if not text.strip():
+            return Counter()
+        tokens = _aso_tokens(text, lang_code)
+        # Fiil/sıfat bağlayıcıları ("based", "including", "seamlessly") ASO
+        # kelimesi değildir; tek kelimelik hedefler isimlerdir.
+        # Etiketleme ham listeleme metni üzerinden yapılır ki bağlam korunsun.
+        return Counter(_noun_filter(tokens, lang_code, context_text=text))
+
+    def brand_words(stats):
+        """Uygulamanın kendi marka adı transfer edilebilir bir ASO kelimesi değildir."""
+        words = set()
+        for key in ('google', 'ios'):
+            store = (stats or {}).get(key)
+            if store:
+                words |= set(_aso_tokens(store.get('title') or '', lang_code))
+                words |= set(_aso_tokens(store.get('developer') or '', lang_code))
+        return words
+
+    try:
+        counts_a = listing_counts(stats_a)
+        counts_b = listing_counts(stats_b)
+        if not counts_a and not counts_b:
+            return result
+
+        brands = brand_words(stats_a) | brand_words(stats_b)
+        for term in brands:
+            counts_a.pop(term, None)
+            counts_b.pop(term, None)
+
+        set_a, set_b = set(counts_a), set(counts_b)
+        result['shared'] = len(set_a & set_b)
+        result['a_only'] = [
+            {'term': t, 'count': int(counts_a[t])}
+            for t, _ in counts_a.most_common() if t not in set_b
+        ][:top_n]
+        result['b_only'] = [
+            {'term': t, 'count': int(counts_b[t])}
+            for t, _ in counts_b.most_common() if t not in set_a
+        ][:top_n]
+        result['available'] = bool(result['a_only'] or result['b_only'])
+    except Exception as e:
+        print(f"Error building competitor keyword gap: {e}")
     return result
 
 
@@ -876,22 +1036,35 @@ def _aso_tokens(text, lang_code='en'):
     return [w for w in words if len(w) >= 3 and not w.isdigit() and w not in stop]
 
 
-def _noun_filter(tokens, lang_code='en'):
-    """ASO anahtar kelimeleri ezici çoğunlukla isimdir ('offline', 'timer'),
-    fiil/sıfat değil ('would', 'love', 'broken'). İngilizce için POS etiketleme
-    ile isimleri süzer.
+def _noun_set(text, lang_code='en'):
+    """Ham metni POS etiketleyip isim olarak geçen kelimelerin kümesini döndürür.
 
-    NLTK'nın etiketleyicisi yalnızca İngilizce çalışır; diğer dillerde veya
-    etiketleyici yoksa token'lar olduğu gibi döndürülür (stopword filtresi
-    yine de uygulanmış olur).
+    Etiketleme HAM metin üzerinde yapılmalıdır: stopword'leri atılmış bir kelime
+    yığınında etiketleyici bağlamsız kalır ve güvenilmez olur — ölçüldü:
+    "audiobooks" fiil (VBP), "wherever" isim (NN) olarak etiketleniyor.
+    """
+    if (lang_code or 'en').lower() != 'en' or not text:
+        return None  # None = "filtreleme yapma"
+    try:
+        import nltk
+        words = re.sub(r'[^\w\s]', ' ', text.lower()).split()
+        return {w for w, tag in nltk.pos_tag(words) if tag.startswith('NN')}
+    except Exception:
+        return None  # etiketleyici yoksa sessizce filtresiz devam et
+
+
+def _noun_filter(tokens, lang_code='en', context_text=None):
+    """Token listesini yalnızca isimlere indirger.
+
+    context_text verilirse etiketleme o ham metin üzerinden yapılır (doğru sonuç);
+    verilmezse token'ların kendisi etiketlenir (bağlam zayıf, geriye dönük uyumluluk).
     """
     if (lang_code or 'en').lower() != 'en' or not tokens:
         return tokens
-    try:
-        import nltk
-        return [word for word, tag in nltk.pos_tag(tokens) if tag.startswith('NN')]
-    except Exception:
-        return tokens  # etiketleyici yoksa sessizce eski davranışa dön
+    nouns = _noun_set(context_text if context_text is not None else ' '.join(tokens), lang_code)
+    if nouns is None:
+        return tokens
+    return [t for t in tokens if t in nouns]
 
 
 def _metadata_health(store_key, stats):
@@ -983,7 +1156,8 @@ def get_aso_report(summary_stats, all_reviews, lang_code='en', top_n=15):
             bigram_freq = Counter()
             for text in texts:
                 tokens = _aso_tokens(text, lang_code)
-                nouns = set(_noun_filter(tokens, lang_code))
+                # Etiketleme ham yorum metni üzerinden yapılır ki bağlam korunsun
+                nouns = set(_noun_filter(tokens, lang_code, context_text=text))
                 unigram_freq.update(nouns)
                 # İfadeler tam akıştan üretilir ki "sound quality" gibi sıfat+isim
                 # kalıpları kaybolmasın, ancak en az bir isim içermeleri gerekir —
@@ -1048,6 +1222,9 @@ def build_app_report(google_id, apple_name, country, language, max_reviews,
         'aso': {'metadata': [], 'keyword_opportunities': [], 'listing_keywords': [],
                 'reviews_analyzed': 0, 'available': False},
         'momentum': {'platforms': [], 'available': False},
+        'responses': {'available': False, 'total': 0, 'replied': 0, 'response_rate': 0.0,
+                      'complaints_total': 0, 'complaints_replied': 0,
+                      'complaint_response_rate': 0.0, 'median_hours': None, 'by_theme': []},
         'error': None,
     }
 
@@ -1079,6 +1256,7 @@ def build_app_report(google_id, apple_name, country, language, max_reviews,
     # ASO ve momentum şikayet filtresinden bağımsız: tüm yorumları kullanır
     report['aso'] = get_aso_report(summary_stats, all_reviews, language)
     report['momentum'] = get_momentum(summary_stats, all_reviews)
+    report['responses'] = get_response_analysis(all_reviews, language)
 
     complaints = preprocess_and_filter_complaints(
         all_reviews, complaint_threshold, apple_name, language, extra_stopwords_str

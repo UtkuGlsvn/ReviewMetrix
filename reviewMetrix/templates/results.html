@@ -554,6 +554,95 @@
             min-width: 4px;
         }
 
+        /* Developer responses */
+        .resp-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 16px;
+            margin-bottom: 26px;
+        }
+
+        .resp-stat {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 16px 18px;
+        }
+
+        .resp-label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 8px;
+        }
+
+        .resp-stat strong {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.9rem;
+            font-weight: 700;
+            display: block;
+        }
+
+        .resp-stat em {
+            font-style: normal;
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+        }
+
+        .resp-col-head {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .resp-col-head em {
+            display: block;
+            font-style: normal;
+            font-weight: 400;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .rate-bar {
+            display: inline-block;
+            width: calc(100% - 52px);
+            height: 8px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 4px;
+            overflow: hidden;
+            vertical-align: middle;
+        }
+
+        .rate-fill {
+            height: 100%;
+            border-radius: 4px;
+        }
+
+        .rate-good {
+            background: var(--green);
+        }
+
+        .rate-warn {
+            background: var(--yellow);
+        }
+
+        .rate-bad {
+            background: var(--red);
+        }
+
+        .rate-text {
+            display: inline-block;
+            width: 46px;
+            text-align: right;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 0.85rem;
+            vertical-align: middle;
+        }
+
         /* ASO section */
         .aso-meta-grid {
             display: grid;
@@ -957,6 +1046,7 @@
             {% if rating_distribution %}<a href="#distribution">Ratings</a>{% endif %}
             {% if themes %}<a href="#themes">Themes</a>{% endif %}
             {% if emerging_keywords and emerging_keywords.keywords %}<a href="#trending">Trending</a>{% endif %}
+            {% if responses and responses.available %}<a href="#responses">Replies</a>{% endif %}
             {% if aso and aso.available %}<a href="#aso">ASO</a>{% endif %}
             {% if version_breakdown %}<a href="#versions">Versions</a>{% endif %}
             <a href="#trends">Trends</a>
@@ -1211,6 +1301,67 @@
                 </div>
                 {% endfor %}
             </div>
+        </div>
+        {% endif %}
+
+        {% if responses and responses.available %}
+        <div id="responses" class="section-anchor"></div>
+        <div class="grid-card full-width-card" style="margin-bottom: 30px;">
+            <h3>💬 Developer Responses
+                <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">Google Play only</span>
+            </h3>
+
+            <div class="resp-stats">
+                <div class="resp-stat">
+                    <span class="resp-label">Reply rate — all reviews</span>
+                    <strong>{{ responses.response_rate }}%</strong>
+                    <em>{{ responses.replied }} of {{ responses.total }}</em>
+                </div>
+                <div class="resp-stat">
+                    <span class="resp-label">Reply rate — complaints</span>
+                    <strong class="{% if responses.complaint_response_rate >= 50 %}st-good{% elif responses.complaint_response_rate >= 20 %}st-warn{% else %}st-bad{% endif %}">{{ responses.complaint_response_rate }}%</strong>
+                    <em>{{ responses.complaints_replied }} of {{ responses.complaints_total }}</em>
+                </div>
+                <div class="resp-stat">
+                    <span class="resp-label">Median reply time</span>
+                    <strong>{% if responses.median_hours is not none %}{{ responses.median_hours }}h{% else %}—{% endif %}</strong>
+                    <em>after the review was posted</em>
+                </div>
+            </div>
+
+            {% if responses.by_theme %}
+            <div class="resp-col-head">Which complaints go unanswered
+                <em>lowest reply rate first — these are the gaps</em>
+            </div>
+            <div class="reviews-table-wrapper">
+                <table class="reviews-table">
+                    <thead>
+                        <tr>
+                            <th>Theme</th>
+                            <th>Reviews</th>
+                            <th>Replied</th>
+                            <th style="width: 34%;">Reply rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in responses.by_theme %}
+                        <tr>
+                            <td style="font-weight: 600;">{{ t.theme }}</td>
+                            <td>{{ t.total }}</td>
+                            <td>{{ t.replied }}</td>
+                            <td>
+                                <div class="rate-bar">
+                                    <div class="rate-fill {% if t.rate >= 50 %}rate-good{% elif t.rate >= 20 %}rate-warn{% else %}rate-bad{% endif %}"
+                                         style="width: {{ t.rate }}%;"></div>
+                                </div>
+                                <span class="rate-text">{{ t.rate }}%</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
         </div>
         {% endif %}
 
