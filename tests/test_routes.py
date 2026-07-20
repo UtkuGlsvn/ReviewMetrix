@@ -1,7 +1,7 @@
-"""Flask route'larının testleri.
+"""Tests for the Flask routes.
 
-Scraping katmanı (fetch_reviews_store) patched_fetch fixture'ı ile
-değiştirildiği için testler ağ erişimi olmadan çalışır.
+The scraping layer is replaced by the patched_fetch fixture, so these run
+without network access.
 """
 import pandas as pd
 import pytest
@@ -50,13 +50,13 @@ def test_analyze_renders_full_dashboard(client, patched_fetch):
     assert resp.status_code == 200
     body = resp.data.decode()
 
-    # Ana bölümlerin hepsi render olmalı
+    # Every main section should render
     for marker in ['Reviews Scraped', 'Complaints Filtered', 'Platform Comparison',
                    'Rating Distribution', 'Complaint Themes']:
-        assert marker in body, f'eksik bölüm: {marker}'
-    # Disa aktarma eylemleri (etiketler kisa, islevi onclick belirler)
-    assert 'window.print()' in body, 'PDF disa aktarma butonu eksik'
-    assert 'exportReviewsCSV()' in body, 'CSV disa aktarma butonu eksik'
+        assert marker in body, f'missing section: {marker}'
+    # Export actions; labels are short, the handler defines the behaviour
+    assert 'window.print()' in body, 'PDF export button missing'
+    assert 'exportReviewsCSV()' in body, 'CSV export button missing'
     assert 'unexpected error occurred' not in body
 
 
@@ -89,7 +89,7 @@ def test_analyze_reports_error_when_no_reviews(client, monkeypatch):
 
 
 def test_analyze_handles_invalid_number_gracefully(client, patched_fetch):
-    """Bozuk sayısal girdi 500 değil, hata sayfası döndürmeli."""
+    """Malformed numeric input should render an error page, not a 500."""
     resp = client.post('/analyze', data=form(max_reviews='not-a-number'))
     assert resp.status_code == 200
     assert 'unexpected error occurred' in resp.data.decode()
@@ -108,11 +108,11 @@ def test_compare_renders_two_apps(client, patched_fetch):
 
     for marker in ['VS', 'Avg Store Rating', 'themesCompareChart',
                    'ratingCompareChart', 'sentimentCompareChart', 'Save as PDF']:
-        assert marker in body, f'eksik bölüm: {marker}'
+        assert marker in body, f'missing section: {marker}'
 
 
 def test_compare_survives_one_failing_app(client, monkeypatch, reviews_df, summary_stats):
-    """B uygulaması veri döndürmese bile sayfa render olmalı ve uyarı göstermeli."""
+    """If app B returns nothing the page should still render, with a warning."""
     from reviewMetrix import analyzer
 
     def selective_fetch(google_id, apple_name, country, lang, max_reviews):
@@ -128,7 +128,7 @@ def test_compare_survives_one_failing_app(client, monkeypatch, reviews_df, summa
     assert resp.status_code == 200
     body = resp.data.decode()
     assert 'No reviews could be found' in body
-    assert 'MockApp' in body, "çalışan uygulamanın verisi yine gösterilmeli"
+    assert 'MockApp' in body, "the app that worked should still be shown"
 
 
 # --------------------------------------------------------------------------
@@ -159,11 +159,11 @@ def test_compare_countries_deduplicates_and_caps_at_six(client, patched_fetch):
     ))
     body = resp.data.decode()
 
-    # us tekrarı sayılmamalı, toplam 6 ülke ile sınırlanmalı
+    # The duplicate us should not count, and the total is capped at six
     assert body.count('class="country-code">') == 6
     assert 'class="country-code">US' in body
     assert body.count('class="country-code">US') == 1
-    # 7. ve sonraki ülkeler dahil edilmemeli
+    # Countries past the sixth are dropped
     assert 'class="country-code">IT' not in body
 
 
@@ -175,7 +175,7 @@ def test_compare_countries_normalizes_case_and_whitespace(client, patched_fetch)
 
 
 # --------------------------------------------------------------------------
-# _avg_store_rating yardımcı fonksiyonu
+# _avg_store_rating helper
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize('stats,expected', [
@@ -184,7 +184,7 @@ def test_compare_countries_normalizes_case_and_whitespace(client, patched_fetch)
     ({'google': None, 'ios': {'rating': 3.0}}, 3.0),
     ({'google': None, 'ios': None}, None),
     (None, None),
-    ({'google': {'rating': 0}, 'ios': None}, None),  # 0 puan = veri yok sayılır
+    ({'google': {'rating': 0}, 'ios': None}, None),  # a 0 rating counts as no data
 ])
 def test_avg_store_rating(stats, expected):
     assert _avg_store_rating(stats) == expected

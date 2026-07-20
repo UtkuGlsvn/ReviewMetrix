@@ -211,8 +211,8 @@
             margin: 0 0 20px 0;
         }
 
-        /* Grid cocuklari icerikten dar olamazsa (min-width: auto) genis ApexCharts
-           SVG'si track'i sisirip sayfayi yana kaydiriyor */
+        /* Grid children default to min-width: auto, so a wide ApexCharts SVG
+           inflates the track and scrolls the page sideways */
         .grid-card,
         .country-card {
             min-width: 0;
@@ -229,7 +229,7 @@
             }
         }
 
-        /* ---- Mobil ---- */
+        /* ---- Mobile ---- */
         @media (max-width: 640px) {
             .dashboard-container {
                 padding: 20px 14px;
@@ -252,7 +252,7 @@
                 font-size: 1.15rem;
             }
 
-            /* Sabit minimum genislik dar ekranda tasmaya yol aciyor */
+            /* A fixed minimum width overflows on narrow screens */
             .country-grid {
                 grid-template-columns: 1fr;
                 gap: 14px;
@@ -372,7 +372,7 @@
         </div>
 
         <script>
-            // ISO ülke kodunu bayrak emojisine çevir
+            // Turn an ISO country code into a flag emoji
             function codeToFlag(code) {
                 if (!code || code.length !== 2) return '🏳️';
                 return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));

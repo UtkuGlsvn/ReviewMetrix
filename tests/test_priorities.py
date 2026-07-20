@@ -1,4 +1,4 @@
-"""Momentum, tema önceliklendirme ve beğeni ağırlıklandırma testleri."""
+"""Tests for momentum, issue prioritization and likes weighting."""
 import pandas as pd
 import pytest
 

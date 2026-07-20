@@ -1,4 +1,4 @@
-"""analyzer.py içindeki saf analiz fonksiyonlarının testleri (ağ erişimi yok)."""
+"""Tests for the pure analysis functions in analyzer.py; no network access."""
 import pandas as pd
 import pytest
 
@@ -12,10 +12,10 @@ from reviewMetrix import analyzer
 def test_rating_distribution_counts_overall_and_per_platform(reviews_df):
     dist = analyzer.get_rating_distribution(reviews_df)
 
-    # scores: 1,2,1,5,2,1,1,4  -> dört adet 1, iki adet 2, bir adet 4, bir adet 5
+    # scores 1,2,1,5,2,1,1,4 -> four 1s, two 2s, one 4, one 5
     assert dist['overall'] == {'1': 4, '2': 2, '3': 0, '4': 1, '5': 1}
     assert set(dist['by_platform']) == {'Google Play', 'App Store'}
-    # Her platformun toplamı kendi yorum sayısına eşit olmalı
+    # Each platform's counts should sum to its own review total
     assert sum(dist['by_platform']['Google Play'].values()) == 4
     assert sum(dist['by_platform']['App Store'].values()) == 4
 
@@ -43,11 +43,11 @@ def test_categorize_complaints_detects_expected_themes(reviews_df):
 
 
 def test_categorize_complaints_sorted_by_priority_and_percent_bounded(reviews_df):
-    """Temalar ham adede göre değil ÖNCELİĞE göre sıralanır."""
+    """Themes are ordered by priority, not by raw count."""
     themes = analyzer.categorize_complaints(reviews_df)
 
     priorities = [t['priority_raw'] for t in themes]
-    assert priorities == sorted(priorities, reverse=True), "temalar önceliğe göre azalan sırada olmalı"
+    assert priorities == sorted(priorities, reverse=True), "themes should be ordered by descending priority"
     for t in themes:
         assert t['count'] > 0
         assert 0 < t['percent'] <= 100
@@ -85,11 +85,11 @@ def test_platform_comparison_without_platform_column(reviews_df):
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize('start,end,expected', [
-    (None, None, 8),              # filtre yok -> hepsi
-    ('2024-02-01', None, 4),      # sadece başlangıç
-    (None, '2024-01-31', 4),      # sadece bitiş
+    (None, None, 8),              # no filter -> everything
+    ('2024-02-01', None, 4),      # start only
+    (None, '2024-01-31', 4),      # end only
     ('2024-01-03', '2024-02-01', 3),
-    ('2030-01-01', None, 0),      # aralık dışında
+    ('2030-01-01', None, 0),      # outside the range
 ])
 def test_filter_by_date_range(reviews_df, start, end, expected):
     result = analyzer.filter_by_date_range(reviews_df, start, end)
@@ -97,7 +97,7 @@ def test_filter_by_date_range(reviews_df, start, end, expected):
 
 
 def test_filter_by_date_range_includes_whole_end_day(reviews_df):
-    """Bitiş günü tam olarak dahil edilmeli (gün ortasındaki saatler kesilmemeli)."""
+    """The end day is inclusive; times during that day must not be cut off."""
     df = reviews_df.copy()
     df.loc[0, 'date'] = pd.Timestamp('2024-01-01 23:30:00')
     result = analyzer.filter_by_date_range(df, '2024-01-01', '2024-01-01')
@@ -120,10 +120,11 @@ def test_filter_by_date_range_returns_input_when_no_date_column():
 # --------------------------------------------------------------------------
 
 def _emerging_df():
-    """İlk yarıda 'ads' baskın; ikinci yarıda 'crash' (4/4) ve 'lag' (2/4) yükseliyor.
+    """"ads" dominates the first half; "crash" (4/4) and "lag" (2/4) rise in
+    the second.
 
-    İki yükselen kelimenin artış oranı kasıtlı olarak farklı (crash > lag), böylece
-    sıralamanın yönü gerçekten test edilebiliyor.
+    The two rising words climb by deliberately different amounts (crash > lag),
+    so the direction of the sort is actually tested.
     """
     return pd.DataFrame({
         'cleaned_review': [
@@ -142,9 +143,9 @@ def test_emerging_keywords_detects_rising_word():
     result = analyzer.get_emerging_keywords(_emerging_df())
     words = [k['word'] for k in result['keywords']]
 
-    assert words[0] == 'crash', "en çok yükselen kelime ilk sırada olmalı"
+    assert words[0] == 'crash', "the fastest-rising word should lead"
     top = result['keywords'][0]
-    assert top['is_new'] is True, "eski pencerede yoksa NEW işaretlenmeli"
+    assert top['is_new'] is True, "absent from the older window means NEW"
     assert top['change'] > 0
     assert result['recent_count'] == 4
     assert result['previous_count'] == 4
@@ -152,18 +153,18 @@ def test_emerging_keywords_detects_rising_word():
 
 
 def test_emerging_keywords_sorted_by_change_desc():
-    """Yükseliş miktarına göre azalan sırada olmalı: crash (%100) > lag (%50)."""
+    """Ordered by descending increase: crash (100%) > lag (50%)."""
     result = analyzer.get_emerging_keywords(_emerging_df())
     words = [k['word'] for k in result['keywords']]
     changes = [k['change'] for k in result['keywords']]
 
-    assert words[:2] == ['crash', 'lag'], f'beklenen sıra crash, lag; gelen: {words}'
+    assert words[:2] == ['crash', 'lag'], f'expected crash, lag; got: {words}'
     assert changes == sorted(changes, reverse=True)
-    assert changes[0] > changes[1], "farklı artış oranları ayırt edilmeli"
+    assert changes[0] > changes[1], "different rates of increase must be distinguished"
 
 
 def test_emerging_keywords_excludes_declining_words():
-    """Azalan kelimeler (ads) sonuçta yer almamalı."""
+    """Declining words such as "ads" must not appear."""
     result = analyzer.get_emerging_keywords(_emerging_df())
     assert 'ads' not in [k['word'] for k in result['keywords']]
 
@@ -193,7 +194,7 @@ def test_version_breakdown_groups_by_version(reviews_df):
 
 
 def test_version_breakdown_sorted_by_complaints_desc():
-    """En çok şikayet alan sürüm ilk sırada olmalı (5.1 -> 3, 5.0 -> 2, 4.9 -> 1)."""
+    """The version with the most complaints leads (5.1 -> 3, 5.0 -> 2, 4.9 -> 1)."""
     df = pd.DataFrame({
         'review': ['crash', 'bug', 'freeze', 'ads', 'slow', 'login'],
         'score': [1, 1, 1, 2, 2, 1],
@@ -217,7 +218,7 @@ def test_version_breakdown_respects_top_n():
 
 
 def test_version_breakdown_empty_when_no_versions(reviews_df):
-    """iOS-only sonuçlarda sürüm bilgisi yoktur -> bölüm boş dönmeli."""
+    """iOS-only results carry no version, so the breakdown comes back empty."""
     df = reviews_df.copy()
     df['version'] = None
     assert analyzer.get_version_breakdown(df) == []
@@ -251,7 +252,7 @@ def test_preprocess_filters_by_threshold_and_cleans_text(reviews_df):
     assert (complaints['score'] <= 2).all()
     assert 'sentiment' in complaints.columns
     assert 'cleaned_review' in complaints.columns
-    # temizlenmiş metinde noktalama ve rakam kalmamalı
+    # No punctuation or digits should survive cleaning
     joined = ' '.join(complaints['cleaned_review'])
     assert ',' not in joined and '.' not in joined
     assert not any(ch.isdigit() for ch in joined)
@@ -268,7 +269,7 @@ def test_preprocess_applies_extra_stopwords(reviews_df):
 
 
 def test_preprocess_returns_none_when_no_complaints(reviews_df):
-    """Eşiğin altında yorum yoksa None dönmeli."""
+    """Returns None when nothing falls under the threshold."""
     high_scores = reviews_df[reviews_df['score'] >= 4]
     assert analyzer.preprocess_and_filter_complaints(
         high_scores, threshold=2, app_name='x', lang_code='en'
@@ -294,23 +295,23 @@ def test_analyze_and_visualize_returns_all_expected_keys(reviews_df):
     }
     assert expected <= set(result)
 
-    # sentiment özeti tutarlı olmalı
+    # The sentiment summary should add up
     s = result['sentiment_summary']
     assert s['positive'] + s['neutral'] + s['negative'] == len(complaints)
-    # word cloud base64 üretilmiş olmalı
+    # A base64 word cloud should have been produced
     assert result['image_data'] and isinstance(result['image_data'], str)
-    # örnek yorumlar platform bilgisini taşımalı
+    # Sample reviews should carry their platform
     assert 'platform' in result['sample_reviews'][0]
 
 
 def test_analyze_and_visualize_trend_data_is_json_safe(reviews_df):
-    """trend_data içindeki değerler numpy değil, saf Python tipleri olmalı."""
+    """trend_data values must be plain Python types, not numpy ones."""
     import json
 
     complaints = analyzer.preprocess_and_filter_complaints(reviews_df, 2, 'mockapp', 'en')
     result = analyzer.analyze_and_visualize(complaints, top_n=5)
 
-    json.dumps(result['trend_data'])  # numpy tipi varsa burada patlar
+    json.dumps(result['trend_data'])  # a numpy type would blow up here
     for row in result['trend_data']:
         assert isinstance(row['avg_score'], float)
         assert isinstance(row['count'], int)
@@ -327,7 +328,7 @@ def test_build_app_report_happy_path(patched_fetch):
     )
 
     assert report['error'] is None
-    assert report['name'] == 'MockApp', "mağaza başlığı görünen ad olmalı"
+    assert report['name'] == 'MockApp', "the store title should be the display name"
     assert report['total_reviews'] == 8
     assert report['complaint_count'] == 6
     assert report['rating_distribution'] is not None
@@ -364,11 +365,11 @@ def test_build_app_report_error_when_no_reviews(monkeypatch):
 
 
 def test_build_app_report_error_when_no_complaints(patched_fetch):
-    """Eşik çok düşükse şikayet bulunamaz ama özet veriler yine dönmeli."""
+    """Too low a threshold finds no complaints, but summary data still comes back."""
     report = analyzer.build_app_report(
         'com.mock', 'mock', 'us', 'en', 50,
         complaint_threshold=0, top_words=10,
     )
     assert report['error'] is not None
-    assert report['total_reviews'] == 8, "şikayet yoksa da toplam yorum sayısı dolu olmalı"
+    assert report['total_reviews'] == 8, "the review total should be populated even with no complaints"
     assert report['rating_distribution'] is not None

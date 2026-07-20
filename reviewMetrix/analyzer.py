@@ -12,7 +12,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import io
 import base64
-import requests # EKLENDİ: Apple iTunes API'den meta veri çekmek için
+import requests
 import urllib.parse
 
 # Import TextBlob for sentiment analysis
@@ -21,10 +21,6 @@ from textblob import TextBlob
 from google_play_scraper import reviews, Sort, app as google_app_details
 from app_store_scraper import AppStore
 
-# Dosyanın en üstüne import kısmına ekleyin:
-import urllib.parse
-
-# 1. fetch_reviews_store Fonksiyonunu şu şekilde güncelleyin:
 def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fetch):
     all_dfs = []
     summary_stats = {'google': None, 'ios': None}
@@ -36,15 +32,15 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
             google_df = pd.DataFrame(google_reviews_data)
             cols = ['content', 'score', 'at']
             rename = {'content': 'review', 'at': 'date'}
-            # Google Play yorumları uygulama sürümünü içerir (varsa koruyoruz)
+            # Google Play exposes the app version a review was written against
             if 'reviewCreatedVersion' in google_df.columns:
                 cols.append('reviewCreatedVersion')
                 rename['reviewCreatedVersion'] = 'version'
-            # Beğeni sayısı: bir şikayeti kaç kullanıcının daha onayladığını gösterir
+            # Likes show how many other users endorsed the same complaint
             if 'thumbsUpCount' in google_df.columns:
                 cols.append('thumbsUpCount')
                 rename['thumbsUpCount'] = 'likes'
-            # Geliştirici yanıtı: itibar yönetimi sinyali
+            # Developer replies are a reputation-management signal
             if 'replyContent' in google_df.columns:
                 cols.append('replyContent')
                 rename['replyContent'] = 'reply'
@@ -73,15 +69,13 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
             'version': gp_details.get('version', 'Unknown'),
             'released': gp_details.get('released', 'Unknown'),
             'description': gp_details.get('description', '')[:200] + '...' if gp_details.get('description') else 'No description',
-            # ASO analizi tam metne ihtiyaç duyar; yukarıdaki kısaltılmış alan yalnızca gösterim içindir
+            # ASO needs the full text; the truncated field above is for display only
             'description_full': gp_details.get('description', '') or '',
         }
     except Exception as e:
         print(f"Google Play fetch error->: {e}")
 
-    # --- Apple Store (AYRILMIŞ BLOKLAR) ---
-    
-    # 1. Önce iTunes API ile Meta Verileri Çek
+    # --- Apple Store: metadata via the iTunes API, reviews via the scraper ---
     try:
         safe_apple_name = urllib.parse.quote(apple_name)
         itunes_url = f"https://itunes.apple.com/search?term={safe_apple_name}&country={country}&entity=software&limit=1"
@@ -103,7 +97,6 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
     except Exception as e:
         print(f"iTunes API Error ->: {e}")
 
-    # 2. Sonra Yorumları Çek
     try:
         apple_scraper = AppStore(country=country, app_name=apple_name)
         apple_scraper.review(how_many=max_reviews_to_fetch)
@@ -111,9 +104,9 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
             apple_df = pd.DataFrame(apple_scraper.reviews)
             apple_df_renamed = apple_df[['review', 'rating', 'date']].rename(columns={'rating': 'score'})
             apple_df_renamed['platform'] = 'App Store'
-            apple_df_renamed['version'] = None  # App Store scraper sürüm bilgisi vermiyor
-            apple_df_renamed['likes'] = 0       # App Store beğeni sayısı vermiyor
-            apple_df_renamed['reply'] = None    # App Store geliştirici yanıtı vermiyor
+            apple_df_renamed['version'] = None  # not exposed by the App Store scraper
+            apple_df_renamed['likes'] = 0       # not exposed by the App Store scraper
+            apple_df_renamed['reply'] = None    # not exposed by the App Store scraper
             apple_df_renamed['replied_at'] = None
             all_dfs.append(apple_df_renamed)
     except Exception as e:  
@@ -124,29 +117,29 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
 
 
 # ---------------------------------------------------------------------------
-# Scraping sonuçları için TTL cache
+# TTL cache for scraping results
 #
-# Mağaza scraping'i yavaş ve rate-limit'e tabi. Aynı (uygulama, ülke, dil,
-# yorum sayısı) kombinasyonu kısa süre içinde tekrar istendiğinde yeniden
-# scrape etmek yerine bellekten dönüyoruz. Özellikle çoklu ülke karşılaştırması
-# ve ardışık denemelerde ciddi hız kazancı sağlıyor.
+# Store scraping is slow and rate-limited. When the same (app, country,
+# language, review count) is requested again within the window we serve it
+# from memory instead of re-scraping. Multi-country comparison benefits most,
+# since it performs one scrape per market.
 # ---------------------------------------------------------------------------
 
-CACHE_TTL_SECONDS = 3600   # 1 saat
-CACHE_MAX_ENTRIES = 32     # bellek kullanımını sınırlar (LRU tahliye)
+CACHE_TTL_SECONDS = 3600   # 1 hour
+CACHE_MAX_ENTRIES = 32     # bounds memory use; oldest entries are evicted
 
 _review_cache = OrderedDict()  # key -> (timestamp, DataFrame, summary_stats)
 _cache_lock = threading.Lock()
 
 
 def clear_review_cache():
-    """Cache'i tamamen boşaltır (testler ve manuel yenileme için)."""
+    """Empty the cache completely (used by tests and manual refresh)."""
     with _cache_lock:
         _review_cache.clear()
 
 
 def review_cache_info():
-    """Cache durumunu döndürür."""
+    """Return the current cache state."""
     with _cache_lock:
         return {
             'entries': len(_review_cache),
@@ -157,11 +150,11 @@ def review_cache_info():
 
 def fetch_reviews_cached(google_id, apple_name, country, lang,
                          max_reviews_to_fetch, ttl=None):
-    """fetch_reviews_store'un TTL cache'li sarmalayıcısı.
+    """TTL-cached wrapper around fetch_reviews_store.
 
-    ttl=0 verilirse cache atlanır (zorunlu yenileme). Boş sonuçlar cache'lenmez;
-    scraper'ın geçici hatası bir saat boyunca sabitlenmesin diye.
-    Dönen veriler kopyadır, böylece çağıran taraf cache'i bozamaz.
+    ttl=0 skips the cache (forced refresh). Empty results are never cached, so
+    a transient scraper failure is not pinned for an hour. Returns copies, so
+    callers cannot corrupt the cached entry.
     """
     ttl = CACHE_TTL_SECONDS if ttl is None else ttl
     key = (google_id, apple_name, country, lang, max_reviews_to_fetch)
@@ -172,9 +165,9 @@ def fetch_reviews_cached(google_id, apple_name, country, lang,
         if entry is not None:
             cached_at, cached_df, cached_stats = entry
             if now - cached_at < ttl:
-                _review_cache.move_to_end(key)  # LRU: en son kullanılan sona
+                _review_cache.move_to_end(key)  # mark as most recently used
                 return cached_df.copy(), copy.deepcopy(cached_stats)
-            del _review_cache[key]  # süresi dolmuş
+            del _review_cache[key]  # expired
 
     reviews_df, summary_stats = fetch_reviews_store(
         google_id, apple_name, country, lang, max_reviews_to_fetch
@@ -186,13 +179,13 @@ def fetch_reviews_cached(google_id, apple_name, country, lang,
                                   copy.deepcopy(summary_stats))
             _review_cache.move_to_end(key)
             while len(_review_cache) > CACHE_MAX_ENTRIES:
-                _review_cache.popitem(last=False)  # en eski kullanılanı at
+                _review_cache.popitem(last=False)  # evict least recently used
 
     return reviews_df, summary_stats
 
 
-# Şikayet temalarını yakalamak için anahtar kelime -> kategori haritası.
-# Her tema, bir yorumda geçtiğinde o temaya sayılan tetikleyici kelimeleri içerir.
+# Keyword -> theme map. A review counts toward a theme if it contains any of
+# that theme's trigger words.
 COMPLAINT_THEMES = {
     'Crashes & Bugs': ['crash', 'bug', 'freeze', 'froze', 'glitch', 'error', 'broken', 'stuck', 'hang', 'force close', 'not working', "doesn't work", 'wont open', "won't open'"],
     'Performance': ['slow', 'lag', 'laggy', 'battery', 'drain', 'heat', 'memory', 'storage', 'loading', 'speed', 'performance'],
@@ -206,9 +199,8 @@ COMPLAINT_THEMES = {
     'Privacy & Ads Tracking': ['privacy', 'data', 'permission', 'tracking', 'security', 'hacked', 'scam'],
 }
 
-# Aynı temaların diğer dillerdeki karşılıkları. Analiz dili İngilizce dışındaysa
-# bu kelimeler İngilizce listeyle BİRLEŞTİRİLİR (yorumlar sık sık İngilizce
-# terim de içerdiği için ikisini birden aramak isabeti artırır).
+# The same themes in other languages. For a non-English analysis these are
+# merged with the English list, since reviews often mix in English terms.
 THEME_KEYWORDS_BY_LANG = {
     'tr': {
         'Crashes & Bugs': ['çöküyor', 'çökme', 'çöktü', 'kapanıyor', 'hata', 'donuyor', 'donma', 'açılmıyor', 'çalışmıyor', 'bozuk', 'kasıyor'],
@@ -262,8 +254,7 @@ THEME_KEYWORDS_BY_LANG = {
 
 
 def get_theme_keywords(lang_code='en'):
-    """Verilen dil için tema->anahtar kelime haritasını döndürür.
-    İngilizce dışındaki diller için İngilizce liste ile birleştirilir."""
+    """Return the theme -> keyword map for a language, merged with English."""
     base = {theme: list(words) for theme, words in COMPLAINT_THEMES.items()}
     extra = THEME_KEYWORDS_BY_LANG.get((lang_code or 'en').lower())
     if extra:
@@ -272,18 +263,17 @@ def get_theme_keywords(lang_code='en'):
     return base
 
 
-# Yaşam boyu ile güncel puan farkının "düşüşte" sayılacağı eşik (yıldız)
+# Gap in stars between lifetime and current rating before it counts as a trend
 MOMENTUM_DECLINE_THRESHOLD = -0.3
 MOMENTUM_IMPROVE_THRESHOLD = 0.3
 
 
 def get_momentum(summary_stats, all_reviews):
-    """Mağazanın gösterdiği YAŞAM BOYU ortalama ile ÇEKİLEN GÜNCEL yorumların
-    ortalamasını karşılaştırır.
+    """Compare the store's lifetime average against the scraped window.
 
-    Mağaza her zaman yaşam boyu ortalamayı gösterir; milyonlarca eski yorum
-    bugünkü bir çöküşü gizleyebilir. Aradaki fark "uygulama düşüşte mi?"
-    sorusunu doğrudan cevaplar.
+    The store only ever shows the lifetime average, where millions of old
+    reviews can hide a present-day collapse. The gap answers "is this app
+    declining?" directly.
     """
     result = {'platforms': [], 'available': False}
     if all_reviews is None or all_reviews.empty or 'score' not in all_reviews.columns:
@@ -336,11 +326,10 @@ def get_momentum(summary_stats, all_reviews):
 
 
 def get_response_analysis(df, lang_code='en'):
-    """Geliştiricinin yorumlara verdiği yanıtları analiz eder.
+    """Analyse the developer's replies to reviews.
 
-    Yanıt oranı ve hızı bir itibar yönetimi sinyalidir; hangi temaların
-    yanıtsız bırakıldığı ise doğrudan aksiyon alınabilir bir boşluktur.
-    Not: yanıt verisi yalnızca Google Play'de mevcuttur.
+    Reply rate and speed are a reputation signal; which themes go unanswered
+    is a directly actionable gap. Reply data is Google Play only.
     """
     result = {
         'available': False,
@@ -358,7 +347,7 @@ def get_response_analysis(df, lang_code='en'):
 
     try:
         work = df.copy()
-        # Yalnızca yanıt alanını sağlayan platformu değerlendir
+        # Only score the platform that exposes a reply field
         if 'platform' in work.columns:
             work = work[work['platform'] == 'Google Play']
         if work.empty:
@@ -369,7 +358,8 @@ def get_response_analysis(df, lang_code='en'):
         result['replied'] = int(has_reply.sum())
         result['response_rate'] = round(result['replied'] * 100 / len(work), 1)
 
-        # Düşük puanlı yorumlarda yanıt oranı daha anlamlı bir göstergedir
+        # The rate on complaints matters more: an app can look responsive
+        # while only answering its praise
         if 'score' in work.columns:
             scores = pd.to_numeric(work['score'], errors='coerce')
             complaint_mask = scores <= 2
@@ -381,7 +371,7 @@ def get_response_analysis(df, lang_code='en'):
                 result['complaint_response_rate'] = round(
                     result['complaints_replied'] * 100 / len(complaints), 1)
 
-        # Yanıt süresi (saat)
+        # Reply latency in hours
         if 'replied_at' in work.columns and result['replied']:
             replied_rows = work[has_reply]
             posted = pd.to_datetime(replied_rows['date'], errors='coerce')
@@ -397,7 +387,7 @@ def get_response_analysis(df, lang_code='en'):
             if not delta_hours.empty:
                 result['median_hours'] = round(float(delta_hours.median()), 1)
 
-        # Hangi temalar yanıtlanıyor, hangileri görmezden geliniyor?
+        # Which themes get answered, and which are ignored?
         theme_keywords = get_theme_keywords(lang_code)
         texts = work['review'].fillna('').astype(str).str.lower()
         by_theme = []
@@ -423,10 +413,10 @@ def get_response_analysis(df, lang_code='en'):
 
 
 def get_competitor_keyword_gap(stats_a, stats_b, lang_code='en', top_n=12):
-    """İki uygulamanın mağaza listelemelerini karşılaştırır.
+    """Compare two apps' store listings.
 
-    - b_only: rakibin hedeflediği ama sizde geçmeyen kelimeler (ASO boşluğunuz)
-    - a_only: sizin hedefleyip rakipte olmayan kelimeler (farklılaştığınız alan)
+    - b_only: terms the competitor targets and you do not (your gap)
+    - a_only: terms you target and they do not (your differentiation)
     """
     result = {'available': False, 'a_only': [], 'b_only': [], 'shared': 0}
 
@@ -441,13 +431,13 @@ def get_competitor_keyword_gap(stats_a, stats_b, lang_code='en', top_n=12):
         if not text.strip():
             return Counter()
         tokens = _aso_tokens(text, lang_code)
-        # Fiil/sıfat bağlayıcıları ("based", "including", "seamlessly") ASO
-        # kelimesi değildir; tek kelimelik hedefler isimlerdir.
-        # Etiketleme ham listeleme metni üzerinden yapılır ki bağlam korunsun.
+        # Connectives like "based", "including", "seamlessly" are not ASO
+        # keywords; single-word targets are nouns. Tagging runs on the raw
+        # listing text so the tagger keeps its context.
         return Counter(_noun_filter(tokens, lang_code, context_text=text))
 
     def brand_words(stats):
-        """Uygulamanın kendi marka adı transfer edilebilir bir ASO kelimesi değildir."""
+        """An app's own brand name is not a transferable ASO keyword."""
         words = set()
         for key in ('google', 'ios'):
             store = (stats or {}).get(key)
@@ -484,8 +474,8 @@ def get_competitor_keyword_gap(stats_a, stats_b, lang_code='en', top_n=12):
 
 
 def get_rating_distribution(df):
-    """Çekilen TÜM yorumların yıldız (1-5) dağılımını hem toplam
-    hem de platform bazında döndürür. Sensor Tower tarzı bir görünüm sağlar."""
+    """Return the 1-5 star distribution of all scraped reviews, overall and
+    per platform."""
     result = {'overall': {str(s): 0 for s in range(1, 6)}, 'by_platform': {}}
     if df is None or df.empty or 'score' not in df.columns:
         return result
@@ -510,9 +500,11 @@ def get_rating_distribution(df):
 
 
 def categorize_complaints(df, lang_code='en'):
-    """Şikayet yorumlarını anahtar kelime eşleştirmesiyle temalara ayırır.
-    Bir yorum birden fazla temaya sayılabilir. En sık temalardan başlayarak sıralı liste döndürür.
-    lang_code verilirse o dilin anahtar kelimeleri de aramaya dahil edilir."""
+    """Group complaints into themes by keyword match.
+
+    A review can count toward several themes. Returns a list ordered by
+    priority. lang_code adds that language's keywords to the search.
+    """
     themes = []
     if df is None or df.empty or 'review' not in df.columns:
         return themes
@@ -523,8 +515,8 @@ def categorize_complaints(df, lang_code='en'):
         score_sums = {theme: 0.0 for theme in theme_keywords}
 
         work = df.dropna(subset=['review']).copy()
-        # itertuples alt çizgiyle başlayan kolon adlarını konumsal isimlere çevirir,
-        # bu yüzden normal bir ad kullanıyoruz
+        # itertuples renames columns starting with an underscore to positional
+        # names, so use a plain one
         work['text_lower'] = work['review'].astype(str).str.lower()
         has_likes = 'likes' in work.columns
         has_score = 'score' in work.columns
@@ -550,9 +542,9 @@ def categorize_complaints(df, lang_code='en'):
             if cnt == 0:
                 continue
             avg_score = round(score_sums[theme] / cnt, 2) if has_score and score_sums[theme] else None
-            # Öncelik = etkilenen kullanıcı sayısı × şiddet
-            #   etkilenen  = şikayet sayısı + beğeniler (her beğeni "ben de" demektir)
-            #   şiddet     = 5 - ortalama puan (daha düşük puan = daha ağır sorun)
+            # priority = affected users x severity
+            #   affected = complaints + likes (a like is another "me too")
+            #   severity = 5 - average rating (lower rating, worse problem)
             affected = cnt + likes[theme]
             severity = (5 - avg_score) if avg_score is not None else 3.0
             themes.append({
@@ -565,7 +557,7 @@ def categorize_complaints(df, lang_code='en'):
                 'priority_raw': round(affected * severity, 2),
             })
 
-        # Görüntüleme için en yüksek önceliğe göre 0-100 arasına normalize et
+        # Normalise to 0-100 against the top theme, for display
         max_priority = max((t['priority_raw'] for t in themes), default=0)
         for t in themes:
             t['priority'] = round(t['priority_raw'] * 100 / max_priority) if max_priority else 0
@@ -577,8 +569,8 @@ def categorize_complaints(df, lang_code='en'):
 
 
 def get_platform_comparison(df):
-    """Google Play ve App Store için ortalama puan, ortalama sentiment ve yorum
-    sayısını karşılaştıran özet döndürür (yalnızca çekilen yorumlar üzerinden)."""
+    """Compare average rating, sentiment and volume per platform, across the
+    scraped reviews only."""
     comparison = []
     if df is None or df.empty or 'platform' not in df.columns:
         return comparison
@@ -600,12 +592,13 @@ def get_platform_comparison(df):
 
 
 def get_emerging_keywords(df, top_n=10):
-    """Şikayetleri zaman ekseninde ikiye bölerek (eski yarı vs yeni yarı) son
-    dönemde YÜKSELEN kelimeleri tespit eder. Sensor Tower tarzı 'trending complaints'.
+    """Find keywords rising in the newer half of the complaints.
 
-    Her pencerede kelimenin 'kaç şikayette geçtiği' (document frequency) o pencerenin
-    şikayet sayısına oranlanır; böylece pencere boyutları farklı olsa da adil karşılaştırılır.
-    Sonuç: yükseliş miktarına (yüzde puan farkı) göre sıralı kelime listesi."""
+    Complaints are split chronologically into an older and a newer window. In
+    each window a word's document frequency is divided by that window's
+    complaint count, so windows of different sizes compare fairly. Returns
+    words ordered by the increase in percentage points.
+    """
     result = {'keywords': [], 'recent_count': 0, 'previous_count': 0, 'split_date': None}
     if df is None or df.empty or 'cleaned_review' not in df.columns or 'date' not in df.columns:
         return result
@@ -615,7 +608,7 @@ def get_emerging_keywords(df, top_n=10):
         work = work.dropna(subset=['dt']).sort_values('dt')
 
         n = len(work)
-        if n < 6:  # trend için anlamlı veri yok
+        if n < 6:  # too little data for a meaningful trend
             return result
 
         mid = n // 2
@@ -643,7 +636,7 @@ def get_emerging_keywords(df, top_n=10):
             rec_pct = rec_hits * 100 / n_rec
             old_pct = old_hits * 100 / n_old
             delta = rec_pct - old_pct
-            # Yalnızca son pencerede en az 2 kez geçen ve yükselen kelimeler
+            # Only rising words that appear at least twice in the newer window
             if rec_hits >= 2 and delta > 0:
                 scored.append({
                     'word': word,
@@ -664,8 +657,10 @@ def get_emerging_keywords(df, top_n=10):
 
 
 def filter_by_date_range(df, start_date=None, end_date=None):
-    """Yorumları verilen tarih aralığına göre filtreler (her ikisi de opsiyonel).
-    start/end 'YYYY-MM-DD' formatında string bekler. Hatalı/eksik girdide veri değişmez."""
+    """Filter reviews to a date range; both bounds are optional.
+
+    Expects 'YYYY-MM-DD' strings. Malformed input leaves the data untouched.
+    """
     if df is None or df.empty or 'date' not in df.columns:
         return df
     if not start_date and not end_date:
@@ -673,7 +668,7 @@ def filter_by_date_range(df, start_date=None, end_date=None):
     try:
         work = df.copy()
         dt = pd.to_datetime(work['date'], errors='coerce')
-        # Zaman dilimi bilgisini kaldır (tz-aware ise), böylece naive tarihlerle karşılaştırılabilir
+        # Strip any timezone so tz-aware values compare against naive bounds
         try:
             dt = dt.dt.tz_localize(None)
         except (TypeError, AttributeError):
@@ -683,7 +678,7 @@ def filter_by_date_range(df, start_date=None, end_date=None):
         if start_date:
             mask &= dt >= pd.to_datetime(start_date)
         if end_date:
-            # Bitiş gününün tamamını dahil et
+            # Include the whole end day
             end_inclusive = pd.to_datetime(end_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
             mask &= dt <= end_inclusive
         return work[mask]
@@ -693,9 +688,9 @@ def filter_by_date_range(df, start_date=None, end_date=None):
 
 
 def get_version_breakdown(df, top_n=8):
-    """Şikayetleri uygulama sürümüne göre gruplar; her sürüm için şikayet sayısı,
-    ortalama puan ve ortalama sentiment döndürür. Hangi sürümde sorun arttığını
-    (regresyon) tespit etmeye yarar. Not: sürüm bilgisi yalnızca Google Play'de mevcut."""
+    """Group complaints by app version, with count, average rating and
+    sentiment, to spot which release caused a spike. Google Play only.
+    """
     result = []
     if df is None or df.empty or 'version' not in df.columns:
         return result
@@ -728,23 +723,23 @@ def get_version_breakdown(df, top_n=8):
 
 
 # ---------------------------------------------------------------------------
-# Çok dilli sentiment
+# Multilingual sentiment
 #
-# TextBlob yalnızca İngilizce çalışır; diğer dillerde her yoruma 0.0 (nötr)
-# döndürür ki bu sessizce yanlıştır. Aşağıdaki sözlükler uygulama yorumlarında
-# sık geçen açıkça olumlu/olumsuz kelimeleri kapsar. Desteklenmeyen dillerde
-# sentiment hesaplanmaz ve arayüz bunu açıkça belirtir.
+# TextBlob only works in English; elsewhere it returns 0.0 for every review,
+# which renders as "neutral" and is silently wrong. The lexicons below cover
+# clearly polar vocabulary common in app reviews. For unsupported languages no
+# sentiment is computed and the UI says so.
 # ---------------------------------------------------------------------------
 
 SENTIMENT_LEXICONS = {
     'tr': {
-        # olumsuz
+        # negative
         'berbat': -1.0, 'rezalet': -1.0, 'korkunç': -1.0, 'iğrenç': -1.0, 'felaket': -1.0,
         'kötü': -0.7, 'saçma': -0.7, 'bozuk': -0.7, 'yavaş': -0.6, 'donuyor': -0.7,
         'çöküyor': -0.8, 'çöktü': -0.8, 'kasıyor': -0.6, 'hatalı': -0.6, 'sorunlu': -0.6,
         'çalışmıyor': -0.8, 'açılmıyor': -0.8, 'pahalı': -0.5, 'gereksiz': -0.5,
         'dolandırıcı': -1.0, 'vasat': -0.4, 'yetersiz': -0.5, 'sinir': -0.7, 'nefret': -0.9,
-        # olumlu
+        # positive
         'harika': 1.0, 'mükemmel': 1.0, 'muhteşem': 1.0, 'süper': 0.8, 'güzel': 0.6,
         'başarılı': 0.7, 'hızlı': 0.6, 'kolay': 0.5, 'faydalı': 0.6, 'bayıldım': 0.9,
         'sevdim': 0.8, 'memnun': 0.7, 'teşekkür': 0.5, 'iyi': 0.5,
@@ -778,7 +773,7 @@ SENTIMENT_LEXICONS = {
     },
 }
 
-# Olumsuzlama ekleri: eşleşen kelimenin polaritesini ters çevirir
+# Negations flip the polarity of a matched word
 NEGATION_WORDS = {
     'tr': {'değil', 'yok', 'hiç'},
     'de': {'nicht', 'kein', 'keine', 'nie', 'niemals'},
@@ -786,20 +781,20 @@ NEGATION_WORDS = {
     'fr': {'ne', 'pas', 'jamais', 'aucun', 'aucune'},
 }
 
-# İngilizce TextBlob ile, diğerleri sözlükle desteklenir
+# English via TextBlob, the rest via lexicon
 SUPPORTED_SENTIMENT_LANGS = {'en'} | set(SENTIMENT_LEXICONS)
 
 _TOKEN_RE = re.compile(r"[^\w']+", re.UNICODE)
 
 
 def is_sentiment_supported(lang_code):
-    """Verilen dilde sentiment analizi yapılabiliyor mu?"""
+    """Can sentiment be computed for this language?"""
     return (lang_code or 'en').lower() in SUPPORTED_SENTIMENT_LANGS
 
 
 def _lexicon_sentiment(text, lang_code):
-    """Sözlük tabanlı polarite. Olumsuzlama kelimesi öncesindeki 2 token içinde
-    geçiyorsa eşleşen kelimenin işareti ters çevrilir."""
+    """Lexicon-based polarity. A negation within the preceding two tokens
+    flips the sign of the matched word."""
     lexicon = SENTIMENT_LEXICONS.get(lang_code, {})
     negations = NEGATION_WORDS.get(lang_code, set())
     tokens = [t for t in _TOKEN_RE.split(text.lower()) if t]
@@ -808,7 +803,7 @@ def _lexicon_sentiment(text, lang_code):
     for i, token in enumerate(tokens):
         polarity = lexicon.get(token)
         if polarity is None:
-            # Ekli biçimleri yakalamak için önek eşleşmesi (kısa kelimelerde riskli, min 5 harf)
+            # Prefix match to catch inflected forms; risky on short words, so min 5 chars
             for entry, value in lexicon.items():
                 if len(entry) >= 5 and token.startswith(entry):
                     polarity = value
@@ -826,12 +821,11 @@ def _lexicon_sentiment(text, lang_code):
 
 
 def get_sentiment(text, lang_code='en'):
-    """Yorumun duygu polaritesini [-1, 1] aralığında döndürür.
+    """Return a review's polarity in [-1, 1].
 
-    İngilizce için TextBlob, desteklenen diğer diller için sözlük tabanlı
-    yöntem kullanılır. Desteklenmeyen dillerde 0.0 döner — bu değerin
-    "nötr" sanılmaması için arayüzde sentiment bölümleri gizlenir
-    (bkz. is_sentiment_supported).
+    TextBlob for English, lexicon-based for the other supported languages.
+    Unsupported languages return 0.0 — so that this is not mistaken for
+    "neutral", the UI hides its sentiment sections (see is_sentiment_supported).
     """
     try:
         if not isinstance(text, str) or not text.strip():
@@ -857,7 +851,7 @@ def preprocess_and_filter_complaints(df, threshold, app_name, lang_code, extra_s
     complaints_df['sentiment'] = complaints_df['review'].apply(
         lambda text: get_sentiment(text, lang_code)
     )
-    # Analiz dilini sonraki adımlara taşı (tema/sentiment dil duyarlılığı için)
+    # Carry the analysis language to the later, language-aware steps
     complaints_df.attrs['lang_code'] = lang_code
 
     lang_map = {'en': 'english', 'tr': 'turkish', 'de': 'german',
@@ -884,7 +878,7 @@ def preprocess_and_filter_complaints(df, threshold, app_name, lang_code, extra_s
     return complaints_df
 
 def analyze_and_visualize(df, top_n, lang_code=None):
-    # Dil açıkça verilmediyse preprocess adımında iliştirilen değeri kullan
+    # Fall back to the language attached during preprocessing
     if lang_code is None:
         lang_code = df.attrs.get('lang_code', 'en')
 
@@ -921,7 +915,7 @@ def analyze_and_visualize(df, top_n, lang_code=None):
             avg_sentiment=('sentiment', 'mean'),
             count=('review', 'count')
         ).sort_index().reset_index()
-        # Numpy tiplerini açıkça Python tiplerine çeviriyoruz ki JSON serileştirme bozulmasın
+        # Cast numpy types to plain Python so JSON serialisation cannot break
         trend_grouped['avg_score'] = trend_grouped['avg_score'].astype(float).round(2)
         trend_grouped['avg_sentiment'] = trend_grouped['avg_sentiment'].astype(float).round(2)
         trend_grouped['count'] = trend_grouped['count'].astype(int)
@@ -932,8 +926,8 @@ def analyze_and_visualize(df, top_n, lang_code=None):
     sample_reviews = []
     try:
         sample_df = df.copy()
-        # En çok beğenilen şikayetler en üstte: beğeni sayısı, kaç kullanıcının
-        # aynı sorunu onayladığını gösterir
+        # Most-endorsed complaints first: likes show how many users hit the
+        # same problem
         if 'likes' in sample_df.columns:
             sample_df['likes'] = pd.to_numeric(sample_df['likes'], errors='coerce').fillna(0).astype(int)
             sample_df = sample_df.sort_values('likes', ascending=False)
@@ -948,13 +942,13 @@ def analyze_and_visualize(df, top_n, lang_code=None):
     except Exception as e:
         print(f"Error preparing sample reviews: {e}")
 
-    # Şikayet temalarını çıkar (analiz dilinin anahtar kelimeleri dahil)
+    # Themes, including the analysis language's keywords
     themes = categorize_complaints(df, lang_code)
 
-    # Yükselen (trending) şikayet kelimeleri
+    # Rising complaint keywords
     emerging_keywords = get_emerging_keywords(df)
 
-    # Sürüm bazlı şikayet dağılımı
+    # Complaints per app version
     version_breakdown = get_version_breakdown(df)
 
     return {
@@ -974,26 +968,25 @@ def analyze_and_visualize(df, top_n, lang_code=None):
 # ---------------------------------------------------------------------------
 # ASO (App Store Optimization)
 #
-# Mağaza listeleme metinlerini kullanıcıların gerçekte kullandığı dille
-# karşılaştırır. En değerli çıktı "keyword gap": kullanıcıların yorumlarda sık
-# kullandığı ama listelemede hiç geçmeyen kelimeler — doğrudan aksiyon alınabilir.
+# Compares the store listing against the language users actually write in.
+# The valuable output is the keyword gap: terms users repeat in reviews that
+# the listing never mentions.
 # ---------------------------------------------------------------------------
 
-# Mağaza karakter limitleri (2024 itibarıyla)
+# Store character limits
 ASO_LIMITS = {
     'google': {'title': 30, 'description': 4000},
     'ios': {'title': 30, 'description': 4000},
 }
 
-# ASO açısından değersiz genel kelimeler. Yorum metinlerinde çok sık geçen ama
-# hiçbir arama niyeti taşımayan fiil/zarf/dolgu kelimeleri elenmezse keyword gap
-# listesi "getting, keeps, ever, thank" gibi gürültüyle dolar.
+# Words with no search intent. Without these, the keyword gap fills up with
+# filler like "getting", "keeps", "ever", "thank".
 ASO_GENERIC_WORDS = {
-    # genel
+    # general
     'app', 'apps', 'application', 'free', 'new', 'best', 'one', 'way', 'thing',
     'things', 'stuff', 'lot', 'bit', 'kind', 'sort', 'part', 'time', 'times',
     'day', 'days', 'week', 'weeks', 'month', 'months', 'year', 'years',
-    # fiiller ve çekimleri
+    # verbs and their inflections
     'get', 'gets', 'getting', 'got', 'use', 'uses', 'using', 'used', 'make',
     'makes', 'making', 'made', 'go', 'goes', 'going', 'went', 'do', 'does',
     'doing', 'did', 'know', 'knows', 'think', 'thinks', 'say', 'says', 'said',
@@ -1001,7 +994,7 @@ ASO_GENERIC_WORDS = {
     'gives', 'put', 'let', 'want', 'wants', 'need', 'needs', 'try', 'tries',
     'trying', 'tell', 'feel', 'feels', 'keep', 'keeps', 'keeping', 'play',
     'plays', 'playing', 'add', 'adds', 'added', 'thank', 'thanks', 'hope',
-    # sıfat/zarf dolguları
+    # adjective and adverb filler
     'like', 'just', 'also', 'can', 'will', 'really', 'much', 'many', 'good',
     'great', 'please', 'even', 'every', 'always', 'never', 'still', 'back',
     'since', 'without', 'everything', 'something', 'anything', 'nothing',
@@ -1015,13 +1008,13 @@ ASO_GENERIC_WORDS = {
     'okay', 'fine', 'ok', 'meh', 'garbage', 'trash', 'crap', 'stupid',
 }
 
-# Bigram'lar tek kelimelerden daha spesifik ASO sinyali taşır ("offline mode",
-# "sound quality"), bu yüzden sıralamada hafifçe öne çıkarılır.
+# Bigrams carry a more specific signal than single words ("offline mode",
+# "sound quality"), so they get a small ranking boost.
 ASO_BIGRAM_BOOST = 1.6
 
 
 def _aso_tokens(text, lang_code='en'):
-    """Metni ASO analizi için anlamlı kelimelere ayırır."""
+    """Split text into the words that carry meaning for ASO."""
     if not isinstance(text, str) or not text.strip():
         return []
     lang_map = {'en': 'english', 'tr': 'turkish', 'de': 'german',
@@ -1037,11 +1030,11 @@ def _aso_tokens(text, lang_code='en'):
 
 
 def _noun_set(text, lang_code='en'):
-    """Ham metni POS etiketleyip isim olarak geçen kelimelerin kümesini döndürür.
+    """POS-tag raw text and return the set of words tagged as nouns.
 
-    Etiketleme HAM metin üzerinde yapılmalıdır: stopword'leri atılmış bir kelime
-    yığınında etiketleyici bağlamsız kalır ve güvenilmez olur — ölçüldü:
-    "audiobooks" fiil (VBP), "wherever" isim (NN) olarak etiketleniyor.
+    Tagging must run on the RAW text: in a stopword-stripped bag the tagger
+    has no context and becomes unreliable. Measured on such a bag,
+    "audiobooks" came back a verb (VBP) and "wherever" a noun (NN).
     """
     if (lang_code or 'en').lower() != 'en' or not text:
         return None  # None = "filtreleme yapma"
@@ -1054,10 +1047,10 @@ def _noun_set(text, lang_code='en'):
 
 
 def _noun_filter(tokens, lang_code='en', context_text=None):
-    """Token listesini yalnızca isimlere indirger.
+    """Reduce a token list to its nouns.
 
-    context_text verilirse etiketleme o ham metin üzerinden yapılır (doğru sonuç);
-    verilmezse token'ların kendisi etiketlenir (bağlam zayıf, geriye dönük uyumluluk).
+    With context_text the tagging runs on that raw text, which is accurate.
+    Without it the tokens themselves are tagged, which loses context.
     """
     if (lang_code or 'en').lower() != 'en' or not tokens:
         return tokens
@@ -1068,7 +1061,7 @@ def _noun_filter(tokens, lang_code='en', context_text=None):
 
 
 def _metadata_health(store_key, stats):
-    """Bir mağaza için başlık/açıklama uzunluğu ve puan sağlığını değerlendirir."""
+    """Score one store's title/description length and rating health."""
     limits = ASO_LIMITS[store_key]
     title = (stats.get('title') or '').strip()
     description = stats.get('description_full') or ''
@@ -1086,7 +1079,7 @@ def _metadata_health(store_key, stats):
         'title': title,
         'title_length': title_len,
         'title_limit': limits['title'],
-        # Başlık limitin %70'inden kısaysa değerli keyword alanı boşta demektir
+        # A title well under the limit leaves valuable keyword space unused
         'title_status': status(title_len >= limits['title'] * 0.7, title_len > 0),
         'description_length': desc_len,
         'description_limit': limits['description'],
@@ -1099,11 +1092,11 @@ def _metadata_health(store_key, stats):
 
 
 def get_aso_report(summary_stats, all_reviews, lang_code='en', top_n=15):
-    """Mağaza listelemesi ile kullanıcı dilini karşılaştıran ASO raporu üretir.
+    """Build an ASO report comparing the listing against user vocabulary.
 
-    - metadata: başlık/açıklama uzunluğu, puan ve yorum sayısı sağlığı
-    - keyword_opportunities: yorumlarda sık geçen ama listelemede olmayan kelimeler
-    - listing_keywords: listelemenin hâlihazırda hedeflediği kelimeler
+    - metadata: title/description length, rating and review-volume health
+    - keyword_opportunities: terms users use that the listing never mentions
+    - listing_keywords: what the listing already targets
     """
     report = {
         'metadata': [],
@@ -1115,7 +1108,7 @@ def get_aso_report(summary_stats, all_reviews, lang_code='en', top_n=15):
 
     try:
         stats = summary_stats or {}
-        # --- Metadata sağlığı ---
+        # --- Metadata health ---
         for key in ('google', 'ios'):
             if stats.get(key):
                 report['metadata'].append(_metadata_health(key, stats[key]))
@@ -1136,18 +1129,18 @@ def get_aso_report(summary_stats, all_reviews, lang_code='en', top_n=15):
                 for term, count in listing_counts.most_common(top_n)
             ]
 
-        # --- Keyword gap: kullanıcı dili vs listeleme ---
+        # --- Keyword gap: user vocabulary vs the listing ---
         if all_reviews is not None and not all_reviews.empty and 'review' in all_reviews.columns:
             texts = all_reviews['review'].dropna().astype(str).tolist()
             report['reviews_analyzed'] = len(texts)
 
             listing_tokens_all = _aso_tokens(listing_text, lang_code)
             listing_word_set = set(listing_tokens_all)
-            # Listelemede geçen ifadeleri de hariç tut
+            # Exclude phrases the listing already uses
             listing_phrase_set = {
                 f'{a} {b}' for a, b in zip(listing_tokens_all, listing_tokens_all[1:])
             }
-            # Uygulama adını da hariç tut (kendi markası ASO fırsatı değil)
+            # Exclude the app's own name; its brand is not an opportunity
             for key in ('google', 'ios'):
                 if stats.get(key):
                     listing_word_set |= set(_aso_tokens(stats[key].get('title') or '', lang_code))
@@ -1156,12 +1149,12 @@ def get_aso_report(summary_stats, all_reviews, lang_code='en', top_n=15):
             bigram_freq = Counter()
             for text in texts:
                 tokens = _aso_tokens(text, lang_code)
-                # Etiketleme ham yorum metni üzerinden yapılır ki bağlam korunsun
+                # Tag the raw review text so the tagger keeps its context
                 nouns = set(_noun_filter(tokens, lang_code, context_text=text))
                 unigram_freq.update(nouns)
-                # İfadeler tam akıştan üretilir ki "sound quality" gibi sıfat+isim
-                # kalıpları kaybolmasın, ancak en az bir isim içermeleri gerekir —
-                # aksi halde "worse worse" gibi anlamsız ikililer listeye sızar.
+                # Phrases come from the unfiltered stream so adjective+noun
+                # patterns like "sound quality" survive, but must contain at
+                # least one noun, otherwise pairs like "worse worse" leak in.
                 bigram_freq.update({
                     f'{a} {b}' for a, b in zip(tokens, tokens[1:])
                     if a in nouns or b in nouns
@@ -1175,7 +1168,7 @@ def get_aso_report(summary_stats, all_reviews, lang_code='en', top_n=15):
             for phrase, mentions in bigram_freq.items():
                 if phrase in listing_phrase_set or mentions < 2:
                     continue
-                # Her iki kelimesi de listelemede geçen ifade yeni bilgi taşımaz
+                # A phrase whose words all appear in the listing adds nothing
                 if all(w in listing_word_set for w in phrase.split()):
                     continue
                 candidates.append((phrase, mentions, mentions * ASO_BIGRAM_BOOST, True))
@@ -1198,10 +1191,11 @@ def get_aso_report(summary_stats, all_reviews, lang_code='en', top_n=15):
 def build_app_report(google_id, apple_name, country, language, max_reviews,
                      complaint_threshold, top_words, extra_stopwords_str="",
                      start_date=None, end_date=None, force_refresh=False):
-    """Tek bir uygulama için uçtan uca analiz çalıştırıp konsolide bir rapor dict'i döndürür.
-    Hem /analyze hem de /compare route'ları tarafından kullanılır.
-    start_date/end_date verilirse yorumlar bu tarih aralığına göre filtrelenir.
-    force_refresh=True ise cache atlanır ve mağazadan yeniden çekilir."""
+    """Run the full analysis for one app and return a consolidated report.
+
+    Shared by the /analyze, /compare and /compare-countries routes.
+    start_date/end_date filter the reviews; force_refresh skips the cache.
+    """
     report = {
         'name': apple_name or google_id or 'Unknown App',
         'summary_stats': {'google': None, 'ios': None},
@@ -1234,7 +1228,7 @@ def build_app_report(google_id, apple_name, country, language, max_reviews,
     )
     report['summary_stats'] = summary_stats
 
-    # Görünen ad olarak mağaza başlığını tercih et
+    # Prefer the store title as the display name
     if summary_stats.get('google'):
         report['name'] = summary_stats['google'].get('title') or report['name']
     elif summary_stats.get('ios'):
@@ -1244,7 +1238,7 @@ def build_app_report(google_id, apple_name, country, language, max_reviews,
         report['error'] = "No reviews could be found or fetched for this app."
         return report
 
-    # Opsiyonel tarih aralığı filtresi
+    # Optional date-range filter
     all_reviews = filter_by_date_range(all_reviews, start_date, end_date)
     if all_reviews.empty:
         report['error'] = "No reviews found within the selected date range."
@@ -1253,7 +1247,7 @@ def build_app_report(google_id, apple_name, country, language, max_reviews,
     report['total_reviews'] = int(len(all_reviews))
     report['rating_distribution'] = get_rating_distribution(all_reviews)
     report['platform_comparison'] = get_platform_comparison(all_reviews)
-    # ASO ve momentum şikayet filtresinden bağımsız: tüm yorumları kullanır
+    # ASO and momentum ignore the complaint filter and use all reviews
     report['aso'] = get_aso_report(summary_stats, all_reviews, language)
     report['momentum'] = get_momentum(summary_stats, all_reviews)
     report['responses'] = get_response_analysis(all_reviews, language)

@@ -10,7 +10,7 @@ def index():
 
 
 def _parse_common_params():
-    """Ortak form parametrelerini okuyup doğrular."""
+    """Read and coerce the form fields shared by every route."""
     return {
         'country': request.form['country'],
         'language': request.form['language'],
@@ -37,7 +37,7 @@ def analyze_reviews():
             params['start_date'], params['end_date'], params['force_refresh'],
         )
 
-        # build_app_report kısmi hatalarda bile summary/dağılımı döndürür
+        # build_app_report still returns summary data on partial failures
         return render_template(
             'results.html',
             error=report['error'],
@@ -70,7 +70,7 @@ def analyze_reviews():
 
 @main_bp.route('/compare', methods=['POST'])
 def compare_apps():
-    """İki uygulamayı yan yana analiz eder."""
+    """Analyse two apps side by side."""
     try:
         params = _parse_common_params()
 
@@ -102,7 +102,7 @@ def compare_apps():
 
 
 def _avg_store_rating(summary_stats):
-    """summary_stats içindeki Google + iOS puanlarının ortalamasını döndürür (yoksa None)."""
+    """Average the Google and iOS store ratings, or None if neither is set."""
     vals = []
     if summary_stats:
         if summary_stats.get('google') and summary_stats['google'].get('rating'):
@@ -114,14 +114,14 @@ def _avg_store_rating(summary_stats):
 
 @main_bp.route('/compare-countries', methods=['POST'])
 def compare_countries():
-    """Aynı uygulamayı birden fazla ülkede analiz edip yan yana karşılaştırır."""
+    """Analyse the same app across several markets."""
     try:
         params = _parse_common_params()
         google_id = request.form.get('google_id', '')
         apple_name = request.form.get('apple_name', '')
 
         countries_raw = request.form.get('countries', '')
-        # Ülke kodlarını ayıkla, tekrarları kaldır, en fazla 6 ülke
+        # Parse country codes, drop duplicates, cap at six
         seen, countries = set(), []
         for c in countries_raw.split(','):
             code = c.strip().lower()

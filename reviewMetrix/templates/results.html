@@ -144,8 +144,8 @@
             margin: 0;
         }
 
-        /* Alt metni kartın dibine sabitler; böylece alt metin sarsa bile
-           tüm kartlarda değerler aynı hizada durur */
+        /* Pin the caption to the bottom so a wrapping caption does not push
+           its number out of line with the other cards */
         .stat-sub {
             font-size: 0.85rem;
             color: var(--text-secondary);
@@ -205,7 +205,7 @@
         .profile-details p strong {
             color: var(--text-secondary);
             flex: 0 0 110px;
-            /* Sabit genişlik etiketi hizalar */
+            /* Fixed width keeps the labels aligned */
         }
 
         .description-box {
@@ -304,7 +304,7 @@
             top: 0;
             z-index: 100;
             display: flex;
-            /* Tek satır: linkler gerekirse kendi içinde kayar, eylemler sağda sabit kalır */
+            /* One row: links scroll within themselves, actions stay pinned right */
             flex-wrap: nowrap;
             align-items: center;
             gap: 8px;
@@ -357,7 +357,8 @@
             color: var(--text-primary);
         }
 
-        /* Yalnızca aktif sekme görünür — PDF de bu sayede tek sekme alır */
+        /* Only the active tab is visible, which is also how PDF export stays
+           scoped to one tab */
         .tab-panel {
             display: none;
         }
@@ -366,7 +367,7 @@
             display: block;
         }
 
-        /* Bölüm linkleri sola, eylemler sağa; ikisi ayrı gruplar hâlinde */
+        /* Section links left, actions right, as two separate groups */
         .nav-links {
             display: flex;
             flex-wrap: nowrap;
@@ -924,9 +925,9 @@
             font-size: 0.8rem;
         }
 
-        /* Grid/flex çocukları varsayılan olarak içeriklerinden daha dar olamaz
-           (min-width: auto). ApexCharts'ın ürettiği geniş SVG bu yüzden track'i
-           şişirip tüm sayfayı yana kaydırıyordu. */
+        /* Grid and flex children default to min-width: auto, so a wide
+           ApexCharts SVG inflates the track and scrolls the whole page
+           sideways. */
         .grid-card,
         .stat-card,
         .aso-meta-card,
@@ -949,7 +950,7 @@
             }
         }
 
-        /* ---- Mobil ---- */
+        /* ---- Mobile ---- */
         @media (max-width: 640px) {
             .dashboard-container {
                 padding: 20px 14px;
@@ -970,7 +971,7 @@
                 border-radius: 18px;
             }
 
-            /* Baslik ve yanindaki aciklama dar ekranda yan yana sikisiyor */
+            /* Heading and its caption cramp side by side on narrow screens */
             .grid-card h3 {
                 flex-direction: column;
                 align-items: flex-start;
@@ -988,7 +989,7 @@
                 font-size: 1.8rem;
             }
 
-            /* Sabit minimum genişlikler dar ekranda taşmaya yol açar */
+            /* Fixed minimum widths overflow on narrow screens */
             .summary-grid,
             .aso-meta-grid,
             .trending-grid,
@@ -997,8 +998,8 @@
                 gap: 14px;
             }
 
-            /* Bölüm linkleri sarmalandığında ekranın yarısını yiyor; mobilde
-               yatay kaydırılabilir tek satır olsun, eylemler sabit kalsın */
+            /* Wrapped section links eat half the screen; keep one
+               horizontally scrollable row with the actions pinned */
             .nav-menu {
                 flex-wrap: nowrap;
                 gap: 8px;
@@ -1052,7 +1053,7 @@
             }
         }
 
-        /* Yazdırma başlığı yalnızca baskıda görünür */
+        /* Print header, shown only when printing */
         .print-only {
             display: none;
         }
@@ -1716,9 +1717,8 @@
 
     {% if not error %}
     <script>
-        // Gizli bir kapsayıcıda ApexCharts genişliği 0 olarak ölçer ve bozuk
-        // render eder. Bu yüzden her grafik, ait olduğu sekme ilk kez
-        // görünür olduğunda oluşturulur.
+        // ApexCharts measures a hidden container as zero width and renders
+        // broken, so each chart is built the first time its tab is shown.
         const pendingCharts = [];
 
         function registerChart(panel, factory) {
@@ -1965,7 +1965,7 @@
         window.exportReviewsCSV = exportReviewsCSV;
         {% endif %}
 
-        // ---- Sekme geçişi ----
+        // ---- Tab switching ----
         const tabButtons = [...document.querySelectorAll('.tab-btn')];
         const tabPanels = [...document.querySelectorAll('.tab-panel')];
 
@@ -1977,7 +1977,7 @@
             });
             tabPanels.forEach(p => p.classList.toggle('is-active', p.dataset.panel === name));
 
-            // Baskı başlığı açık sekmeyi yansıtsın (rozet sayısı hariç)
+            // Print header follows the open tab, without the count badge
             const label = tabButtons.find(b => b.dataset.tab === name);
             const printSection = document.getElementById('printSection');
             if (label && printSection) {
@@ -1988,17 +1988,17 @@
                     .trim();
             }
 
-            // Panel görünür olduktan sonra grafikleri oluştur ki genişlik doğru ölçülsün
+            // Build charts once the panel is visible so widths measure correctly
             renderChartsFor(name);
 
-            // Sekme adresi paylaşılabilir olsun
+            // Make the open tab shareable via the URL
             history.replaceState(null, '', '#' + name);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         tabButtons.forEach(b => b.addEventListener('click', () => activateTab(b.dataset.tab)));
 
-        // Açılışta URL'deki sekmeyi (varsa) seç, yoksa varsayılan sekmenin grafiklerini çiz
+        // Open the tab named in the URL, otherwise draw the default tab
         const initial = (location.hash || '').replace('#', '');
         if (initial && tabButtons.some(b => b.dataset.tab === initial)) {
             activateTab(initial);
@@ -2006,8 +2006,8 @@
             renderChartsFor('overview');
         }
 
-        // Yazdırma yalnızca açık sekmeyi alır (gizli paneller display:none).
-        // Grafiklerin baskıda boş çıkmaması için yazdırmadan önce yeniden boyutlandır.
+        // Printing covers the open tab only, since hidden panels are
+        // display:none. Resize first so charts are not blank on the page.
         window.addEventListener('beforeprint', () => window.dispatchEvent(new Event('resize')));
     </script>
     {% endif %}

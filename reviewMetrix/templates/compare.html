@@ -294,8 +294,8 @@
             margin-top: 12px;
         }
 
-        /* Grid cocuklari icerikten dar olamazsa (min-width: auto) genis ApexCharts
-           SVG'si track'i sisirip sayfayi yana kaydiriyor */
+        /* Grid children default to min-width: auto, so a wide ApexCharts SVG
+           inflates the track and scrolls the page sideways */
         .grid-card,
         .vs-app,
         .metrics-card {
@@ -315,7 +315,7 @@
             }
         }
 
-        /* ---- Mobil ---- */
+        /* ---- Mobile ---- */
         @media (max-width: 640px) {
             .dashboard-container {
                 padding: 20px 14px;
@@ -338,7 +338,7 @@
                 padding: 16px 18px;
             }
 
-            /* VS basligi: iki uygulama alt alta, rozet ortada */
+            /* Versus header: apps stack, badge centred */
             .vs-header {
                 grid-template-columns: 1fr;
                 gap: 10px;
@@ -359,10 +359,10 @@
                 font-size: 1.2rem;
             }
 
-            /* Karsilastirma satiri dar ekranda 3 kolona sigmiyor: etiket ustte,
-               iki deger altta yan yana. Degerler kendi sutunlarinda ORTALANIR —
-               aksi halde sag/sol hizali olduklari icin ortada birlesip tek bir
-               sayi gibi okunuyorlar ("4.56" + "4.32" -> "4.564.32"). */
+            /* Three columns do not fit: label on top, the two values below.
+               The values are centred in their own columns — left/right aligned
+               they collide in the middle and read as one number
+               ("4.56" + "4.32" -> "4.564.32"). */
             .metric-row {
                 grid-template-columns: 1fr 1fr;
                 row-gap: 6px;
@@ -384,7 +384,7 @@
                 font-size: 1.35rem;
             }
 
-            /* Iki degeri gorsel olarak ayiran ince cizgi */
+            /* Thin rule separating the two values */
             .metric-val.b {
                 border-left: 1px solid rgba(255, 255, 255, 0.08);
             }

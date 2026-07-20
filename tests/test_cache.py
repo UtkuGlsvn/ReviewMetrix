@@ -1,7 +1,7 @@
-"""Scraping sonuç cache'inin testleri.
+"""Tests for the scraping result cache.
 
-Cache modül düzeyinde yaşar; conftest'teki autouse clear_cache fixture'ı
-her testten önce/sonra onu boşaltır.
+The cache lives at module level; the autouse clear_cache fixture in conftest
+empties it around every test.
 """
 import pandas as pd
 import pytest
@@ -11,7 +11,7 @@ from reviewMetrix import analyzer
 
 @pytest.fixture
 def counting_fetch(monkeypatch, reviews_df, summary_stats):
-    """fetch_reviews_store'u sayaçlı sahte bir fonksiyonla değiştirir."""
+    """Replace fetch_reviews_store with a call-counting fake."""
     calls = []
 
     def fake_fetch(google_id, apple_name, country, lang, max_reviews):
@@ -26,14 +26,14 @@ ARGS = ('com.mock', 'mock', 'us', 'en', 50)
 
 
 # --------------------------------------------------------------------------
-# Temel cache davranışı
+# Basic cache behaviour
 # --------------------------------------------------------------------------
 
 def test_second_call_hits_cache(counting_fetch):
     analyzer.fetch_reviews_cached(*ARGS)
     analyzer.fetch_reviews_cached(*ARGS)
 
-    assert len(counting_fetch) == 1, "ikinci çağrı cache'ten dönmeli"
+    assert len(counting_fetch) == 1, "the second call should come from cache"
 
 
 def test_cached_result_equals_fresh_result(counting_fetch):
@@ -47,51 +47,51 @@ def test_cached_result_equals_fresh_result(counting_fetch):
 def test_different_keys_are_cached_separately(counting_fetch):
     analyzer.fetch_reviews_cached('com.a', 'a', 'us', 'en', 50)
     analyzer.fetch_reviews_cached('com.b', 'b', 'us', 'en', 50)
-    analyzer.fetch_reviews_cached('com.a', 'a', 'gb', 'en', 50)   # farklı ülke
-    analyzer.fetch_reviews_cached('com.a', 'a', 'us', 'en', 100)  # farklı adet
+    analyzer.fetch_reviews_cached('com.a', 'a', 'gb', 'en', 50)   # different country
+    analyzer.fetch_reviews_cached('com.a', 'a', 'us', 'en', 100)  # different review count
 
     assert len(counting_fetch) == 4
-    analyzer.fetch_reviews_cached('com.a', 'a', 'us', 'en', 50)   # ilkinin tekrarı
-    assert len(counting_fetch) == 4, "aynı anahtar yeniden scrape etmemeli"
+    analyzer.fetch_reviews_cached('com.a', 'a', 'us', 'en', 50)   # repeat of the first
+    assert len(counting_fetch) == 4, "the same key should not scrape again"
 
 
 # --------------------------------------------------------------------------
-# TTL / zorunlu yenileme
+# TTL and forced refresh
 # --------------------------------------------------------------------------
 
 def test_expired_entry_is_refetched(counting_fetch):
     analyzer.fetch_reviews_cached(*ARGS, ttl=3600)
-    # ttl=0 -> her kayıt süresi dolmuş sayılır
+    # ttl=0 treats every entry as expired
     analyzer.fetch_reviews_cached(*ARGS, ttl=0)
 
     assert len(counting_fetch) == 2
 
 
 def test_ttl_zero_bypasses_but_still_stores(counting_fetch):
-    """Zorunlu yenileme cache'i atlar ama taze sonucu yine de saklar."""
+    """A forced refresh skips the cache but still stores the fresh result."""
     analyzer.fetch_reviews_cached(*ARGS, ttl=0)
     assert len(counting_fetch) == 1
 
-    analyzer.fetch_reviews_cached(*ARGS)  # normal TTL -> taze kayıttan dönmeli
+    analyzer.fetch_reviews_cached(*ARGS)  # normal TTL should hit the fresh entry
     assert len(counting_fetch) == 1
 
 
 def test_force_refresh_in_build_app_report(counting_fetch):
     analyzer.build_app_report('com.mock', 'mock', 'us', 'en', 50, 2, 10)
     analyzer.build_app_report('com.mock', 'mock', 'us', 'en', 50, 2, 10)
-    assert len(counting_fetch) == 1, "ikinci rapor cache kullanmalı"
+    assert len(counting_fetch) == 1, "the second report should use the cache"
 
     analyzer.build_app_report('com.mock', 'mock', 'us', 'en', 50, 2, 10,
                               force_refresh=True)
-    assert len(counting_fetch) == 2, "force_refresh cache'i atlamalı"
+    assert len(counting_fetch) == 2, "force_refresh should bypass the cache"
 
 
 # --------------------------------------------------------------------------
-# Boş sonuçlar cache'lenmemeli
+# Empty results are never cached
 # --------------------------------------------------------------------------
 
 def test_empty_result_is_not_cached(monkeypatch):
-    """Scraper geçici olarak boş dönerse bu bir saat boyunca sabitlenmemeli."""
+    """A transient empty scrape must not be pinned for an hour."""
     calls = []
 
     def empty_fetch(*args):
@@ -103,19 +103,19 @@ def test_empty_result_is_not_cached(monkeypatch):
     analyzer.fetch_reviews_cached(*ARGS)
     analyzer.fetch_reviews_cached(*ARGS)
 
-    assert len(calls) == 2, "boş sonuç cache'lenmemeli"
+    assert len(calls) == 2, "an empty result should not be cached"
     assert analyzer.review_cache_info()['entries'] == 0
 
 
 # --------------------------------------------------------------------------
-# İzolasyon: cache'ten dönen veri değiştirilse bile cache bozulmamalı
+# Isolation: mutating returned data must not corrupt the cache
 # --------------------------------------------------------------------------
 
 def test_mutating_returned_dataframe_does_not_corrupt_cache(counting_fetch):
     df1, _ = analyzer.fetch_reviews_cached(*ARGS)
     original_len = len(df1)
 
-    df1.drop(df1.index[0], inplace=True)          # çağıran taraf veriyi bozuyor
+    df1.drop(df1.index[0], inplace=True)          # the caller corrupts the data
     df1['review'] = 'overwritten'
 
     df2, _ = analyzer.fetch_reviews_cached(*ARGS)
@@ -134,7 +134,7 @@ def test_mutating_returned_stats_does_not_corrupt_cache(counting_fetch):
 
 
 # --------------------------------------------------------------------------
-# LRU tahliye ve cache yönetimi
+# LRU eviction and cache management
 # --------------------------------------------------------------------------
 
 def test_cache_evicts_oldest_beyond_max_entries(counting_fetch, monkeypatch):
@@ -145,27 +145,27 @@ def test_cache_evicts_oldest_beyond_max_entries(counting_fetch, monkeypatch):
 
     assert analyzer.review_cache_info()['entries'] == 3
 
-    # İlk giren (app0) tahliye edilmiş olmalı -> yeniden scrape edilir
+    # app0 went in first, so it should have been evicted and re-scraped
     before = len(counting_fetch)
     analyzer.fetch_reviews_cached('com.app0', 'app0', 'us', 'en', 50)
     assert len(counting_fetch) == before + 1
 
 
 def test_recently_used_entry_survives_eviction(counting_fetch, monkeypatch):
-    """LRU: yakın zamanda kullanılan kayıt, eski olsa da tahliye edilmemeli."""
+    """A recently used entry survives eviction even if it went in earlier."""
     monkeypatch.setattr(analyzer, 'CACHE_MAX_ENTRIES', 2)
 
     analyzer.fetch_reviews_cached('com.a', 'a', 'us', 'en', 50)
     analyzer.fetch_reviews_cached('com.b', 'b', 'us', 'en', 50)
-    analyzer.fetch_reviews_cached('com.a', 'a', 'us', 'en', 50)  # a'yı tazele
-    analyzer.fetch_reviews_cached('com.c', 'c', 'us', 'en', 50)  # b tahliye olmalı
+    analyzer.fetch_reviews_cached('com.a', 'a', 'us', 'en', 50)  # refresh a
+    analyzer.fetch_reviews_cached('com.c', 'c', 'us', 'en', 50)  # b should be evicted
 
     before = len(counting_fetch)
     analyzer.fetch_reviews_cached('com.a', 'a', 'us', 'en', 50)
-    assert len(counting_fetch) == before, "a hâlâ cache'te olmalı"
+    assert len(counting_fetch) == before, "a should still be cached"
 
     analyzer.fetch_reviews_cached('com.b', 'b', 'us', 'en', 50)
-    assert len(counting_fetch) == before + 1, "b tahliye edilmiş olmalı"
+    assert len(counting_fetch) == before + 1, "b should have been evicted"
 
 
 def test_clear_review_cache_empties_it(counting_fetch):
@@ -176,11 +176,11 @@ def test_clear_review_cache_empties_it(counting_fetch):
     assert analyzer.review_cache_info()['entries'] == 0
 
     analyzer.fetch_reviews_cached(*ARGS)
-    assert len(counting_fetch) == 2, "temizlikten sonra yeniden scrape edilmeli"
+    assert len(counting_fetch) == 2, "a cleared cache should scrape again"
 
 
 # --------------------------------------------------------------------------
-# Route seviyesinde cache
+# Cache at the route level
 # --------------------------------------------------------------------------
 
 def test_repeated_analyze_requests_scrape_once(client, counting_fetch):
@@ -215,7 +215,7 @@ def test_country_comparison_caches_per_country(client, counting_fetch):
         'countries': 'us, gb, de',
     }
     client.post('/compare-countries', data=data)
-    assert len(counting_fetch) == 3, "her ülke için bir kez scrape"
+    assert len(counting_fetch) == 3, "one scrape per country"
 
     client.post('/compare-countries', data=data)
-    assert len(counting_fetch) == 3, "ikinci istek tamamen cache'ten gelmeli"
+    assert len(counting_fetch) == 3, "the second request should be fully cached"

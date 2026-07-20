@@ -1,4 +1,4 @@
-"""Geliştirici yanıt analizi ve rakip ASO listeleme boşluğu testleri."""
+"""Tests for developer response analysis and the competitor ASO listing gap."""
 import pandas as pd
 import pytest
 
@@ -6,7 +6,7 @@ from reviewMetrix import analyzer
 
 
 def _df(rows, platform='Google Play'):
-    """rows: (review, score, reply, hours_to_reply) dortlulerinden DataFrame."""
+    """Build a DataFrame from (review, score, reply, hours_to_reply) tuples."""
     posted = pd.Timestamp('2024-01-01 09:00:00')
     return pd.DataFrame({
         'review': [r[0] for r in rows],
@@ -35,7 +35,7 @@ def _stats(title='Mock Music', description='Listen to music and podcasts offline
 
 
 # ==========================================================================
-# Yanıt oranı ve hızı
+# Reply rate and speed
 # ==========================================================================
 
 def test_response_rate_counts_replies():
@@ -54,19 +54,19 @@ def test_response_rate_counts_replies():
 
 
 def test_complaint_response_rate_is_measured_separately():
-    """Sikayetlere yanit orani, genel orandan daha anlamli bir gostergedir."""
+    """The rate on complaints says more than the overall rate."""
     df = _df([
-        ('crash', 1, None, None),      # sikayet, yanitsiz
-        ('ads', 2, None, None),        # sikayet, yanitsiz
-        ('love it', 5, 'Thanks!', 1),  # ovgu, yanitli
-        ('nice', 5, 'Thanks!', 1),     # ovgu, yanitli
+        ('crash', 1, None, None),      # complaint, unanswered
+        ('ads', 2, None, None),        # complaint, unanswered
+        ('love it', 5, 'Thanks!', 1),  # praise, answered
+        ('nice', 5, 'Thanks!', 1),     # praise, answered
     ])
     r = analyzer.get_response_analysis(df)
 
-    assert r['response_rate'] == 50.0, 'genel oran iyi gorunuyor'
+    assert r['response_rate'] == 50.0, 'the overall rate looks healthy'
     assert r['complaints_total'] == 2
     assert r['complaints_replied'] == 0
-    assert r['complaint_response_rate'] == 0.0, 'ama sikayetlerin hicbirine yanit yok'
+    assert r['complaint_response_rate'] == 0.0, 'but no complaint was answered'
 
 
 def test_median_reply_time_in_hours():
@@ -79,7 +79,7 @@ def test_median_reply_time_in_hours():
 
 
 def test_negative_reply_times_are_ignored():
-    """Bozuk veri (yanit tarihi yorumdan once) medyani bozmamali."""
+    """Broken data (a reply dated before the review) must not skew the median."""
     df = _df([('a', 1, 'reply', -50), ('b', 1, 'reply', 6)])
     assert analyzer.get_response_analysis(df)['median_hours'] == 6.0
 
@@ -92,16 +92,16 @@ def test_blank_replies_do_not_count():
 
 
 # ==========================================================================
-# Tema bazlı ihmal analizi — asıl aksiyon alınabilir çıktı
+# Per-theme neglect, the actionable output
 # ==========================================================================
 
 def test_by_theme_surfaces_ignored_themes_first():
     df = _df([
-        # Ads: 3 sikayet, hicbirine yanit yok
+        # Ads: three complaints, none answered
         ('too many ads', 2, None, None),
         ('ads everywhere', 2, None, None),
         ('more ads', 2, None, None),
-        # Crashes: 2 sikayet, ikisine de yanit
+        # Crashes: two complaints, both answered
         ('app crash', 1, 'We are on it', 3),
         ('crash again', 1, 'Please contact us', 4),
     ])
@@ -109,7 +109,7 @@ def test_by_theme_surfaces_ignored_themes_first():
 
     assert by_theme['Ads']['rate'] == 0.0
     assert by_theme['Crashes & Bugs']['rate'] == 100.0
-    # En dusuk oranli tema listede once gelmeli
+    # The lowest-rate theme should come first
     first = analyzer.get_response_analysis(df)['by_theme'][0]
     assert first['theme'] == 'Ads'
 
@@ -122,11 +122,11 @@ def test_by_theme_excludes_themes_with_no_reviews():
 
 
 # ==========================================================================
-# Kenar durumlar
+# Edge cases
 # ==========================================================================
 
 def test_app_store_only_returns_unavailable():
-    """Yanit verisi yalnizca Google Play'de var."""
+    """Reply data exists on Google Play only."""
     df = _df([('crash', 1, None, None)], platform='App Store')
     assert analyzer.get_response_analysis(df)['available'] is False
 
@@ -138,7 +138,7 @@ def test_only_google_play_rows_are_measured():
     ], ignore_index=True)
     r = analyzer.get_response_analysis(df)
 
-    assert r['total'] == 1, 'App Store satirlari orani seyreltmemeli'
+    assert r['total'] == 1, 'App Store rows must not dilute the rate'
     assert r['response_rate'] == 100.0
 
 
@@ -152,7 +152,7 @@ def test_empty_dataframe_returns_unavailable():
 
 
 def test_no_replies_at_all_still_available():
-    """Hic yanit yoksa da bu bir bulgudur: oran %0."""
+    """No replies at all is itself a finding: a 0% rate."""
     df = _df([('a', 1, None, None), ('b', 2, None, None)])
     r = analyzer.get_response_analysis(df)
     assert r['available'] is True
@@ -170,7 +170,7 @@ def test_build_app_report_includes_responses(monkeypatch):
 
 
 # ==========================================================================
-# Rakip ASO listeleme boşluğu
+# Competitor ASO listing gap
 # ==========================================================================
 
 def test_competitor_gap_splits_unique_keywords():
@@ -198,7 +198,7 @@ def test_competitor_gap_excludes_shared_terms():
 
 
 def test_competitor_gap_excludes_brand_names():
-    """Rakibin marka adi hedeflenebilir bir ASO kelimesi degildir."""
+    """A competitor's brand name is not a targetable ASO keyword."""
     a = _stats(title='Spotify Music', description='Spotify brings you music.',
                developer='Spotify AB')
     b = _stats(title='Deezer Audio', description='Deezer brings you radio.',
@@ -225,15 +225,15 @@ def test_competitor_gap_respects_top_n():
 
 
 # ==========================================================================
-# POS etiketleme bağlam düzeltmesi
+# POS tagging context fix
 # ==========================================================================
 
 def test_noun_filter_uses_raw_context_when_given():
-    """Stopword'leri atilmis bir yiginda POS etiketleyici baglamsiz kalir ve yanilir.
+    """In a stopword-stripped bag the POS tagger loses context and misfires.
 
-    Olculen kontrast: ayni token listesi icin 'wherever' baglamsiz yiginda isim
-    (NN) sayilip tutuluyor, ham cumle verildiginde zarf (WRB) oldugu anlasilip
-    dogru sekilde eleniyor.
+    The measured contrast: for the same token list "wherever" is tagged a noun
+    (NN) and kept in the bare bag, but recognised as an adverb (WRB) and
+    correctly dropped once the raw sentence is supplied.
     """
     raw = 'listen to music and podcasts and audiobooks wherever you are'
     tokens = ['music', 'podcasts', 'audiobooks', 'wherever']
@@ -241,9 +241,9 @@ def test_noun_filter_uses_raw_context_when_given():
     with_context = analyzer._noun_filter(tokens, 'en', context_text=raw)
     without_context = analyzer._noun_filter(tokens, 'en')
 
-    assert 'wherever' not in with_context, 'baglamla zarf oldugu anlasilmali'
-    assert 'wherever' in without_context, 'baglamsiz halde yanlis etiketlenir'
-    # Gercek isimler her iki durumda da korunur
+    assert 'wherever' not in with_context, 'with context it reads as an adverb'
+    assert 'wherever' in without_context, 'without context it is mistagged'
+    # Real nouns survive either way
     assert {'music', 'podcasts'} <= set(with_context)
 
 
@@ -270,13 +270,12 @@ def test_results_page_renders_response_section(client, patched_fetch):
     })
     body = resp.data.decode()
     assert resp.status_code == 200
-    # patched_fetch yanit kolonu uretmiyor -> bolum gizli olmali
+    # patched_fetch produces no reply column, so the section stays hidden
     assert ('Developer Responses' in body) == ('href="#responses"' in body)
 
 
 def test_compare_page_renders_keyword_gap(client, monkeypatch, reviews_df):
-    """Iki uygulamanin listelemeleri FARKLI olmali; ayni listelemede bosluk
-    cikmamasi dogru davranistir."""
+    """The listings must differ; no gap between identical listings is correct."""
     def fetch_by_app(google_id, apple_name, country, lang, max_reviews):
         if google_id == 'com.mock.b':
             return reviews_df.copy(), _stats(
@@ -297,11 +296,11 @@ def test_compare_page_renders_keyword_gap(client, monkeypatch, reviews_df):
 
     assert resp.status_code == 200
     assert 'ASO Listing Gap' in body
-    assert 'performances' in body, 'rakibin hedefledigi kelime gosterilmeli'
+    assert 'performances' in body, 'a competitor-only keyword should be shown'
 
 
 def test_compare_identical_listings_show_no_gap(client, patched_fetch):
-    """Ayni listelemeye sahip iki uygulama arasinda ASO boslugu olmamali."""
+    """Two apps with identical listings should show no ASO gap."""
     resp = client.post('/compare', data={
         'google_id': 'com.mock.app', 'apple_name': 'mockapp',
         'google_id_b': 'com.mock.b', 'apple_name_b': 'mockb',

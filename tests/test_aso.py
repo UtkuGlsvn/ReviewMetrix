@@ -1,4 +1,4 @@
-"""ASO (App Store Optimization) analiz testleri."""
+"""Tests for the ASO (App Store Optimization) analysis."""
 import pandas as pd
 import pytest
 
@@ -26,7 +26,7 @@ def _reviews(texts):
 
 
 # --------------------------------------------------------------------------
-# Metadata sağlığı
+# Metadata health
 # --------------------------------------------------------------------------
 
 def test_metadata_health_reports_lengths_and_limits():
@@ -40,7 +40,7 @@ def test_metadata_health_reports_lengths_and_limits():
 
 
 def test_short_title_flagged_as_wasted_keyword_space():
-    """Limitin çok altındaki başlık değerli keyword alanını boşa harcar."""
+    """A title well under the limit wastes valuable keyword space."""
     short = analyzer.get_aso_report(_stats(title='App'), _reviews(['x']), 'en')
     full = analyzer.get_aso_report(_stats(title='Mock Music Player Radio Songs'), _reviews(['x']), 'en')
 
@@ -67,11 +67,11 @@ def test_metadata_covers_both_stores_when_present():
 
 
 # --------------------------------------------------------------------------
-# Keyword gap — asıl değer
+# Keyword gap, the valuable output
 # --------------------------------------------------------------------------
 
 def test_keyword_gap_surfaces_terms_missing_from_listing():
-    """Kullanıcılar 'alarm' diyor, listeleme hiç bahsetmiyor -> fırsat."""
+    """Users say "alarm" and the listing never does, so it is an opportunity."""
     stats = _stats(description='Listen to music and podcasts. Stream playlists offline.')
     reviews = _reviews([
         'I use the alarm every morning',
@@ -83,7 +83,7 @@ def test_keyword_gap_surfaces_terms_missing_from_listing():
     report = analyzer.get_aso_report(stats, reviews, 'en')
     terms = [k['term'] for k in report['keyword_opportunities']]
 
-    assert 'alarm' in terms, f'alarm bulunamadi: {terms}'
+    assert 'alarm' in terms, f'alarm not surfaced: {terms}'
 
 
 def test_terms_already_in_listing_are_excluded():
@@ -98,10 +98,10 @@ def test_terms_already_in_listing_are_excluded():
 
 
 def test_single_mention_terms_are_ignored_as_noise():
-    """Bir kez gecen kelime gurultudur; iki kez gecen sinyaldir.
+    """One mention is noise, two is signal.
 
-    Kullanilan kelimeler cumle icinde isim olarak etiketlenir, boylece testin
-    frekans esigini olctugunden emin oluruz (isim filtresini degil).
+    The words are tagged as nouns in context, so this measures the frequency
+    threshold rather than the noun filter.
     """
     stats = _stats(description='Music app.')
     reviews = _reviews([
@@ -111,8 +111,8 @@ def test_single_mention_terms_are_ignored_as_noise():
     ])
 
     terms = [k['term'] for k in analyzer.get_aso_report(stats, reviews, 'en')['keyword_opportunities']]
-    assert 'timer' in terms, f'iki kez gecen kelime kalmali: {terms}'
-    assert 'widget' not in terms, f'tek seferlik kelime elenmeli: {terms}'
+    assert 'timer' in terms, f'a twice-mentioned word should stay: {terms}'
+    assert 'widget' not in terms, f'a single mention should be dropped: {terms}'
 
 
 def test_phrases_are_detected_and_flagged():
@@ -132,7 +132,7 @@ def test_phrases_are_detected_and_flagged():
 
 
 def test_generic_filler_words_are_filtered_out():
-    """'would', 'getting', 'thank' gibi kelimeler ASO sinyali degildir."""
+    """Words like "would", "getting" and "thank" carry no ASO signal."""
     stats = _stats(description='A music app.')
     reviews = _reviews([
         'I would really like getting this thank you',
@@ -142,7 +142,7 @@ def test_generic_filler_words_are_filtered_out():
 
     terms = [k['term'] for k in analyzer.get_aso_report(stats, reviews, 'en')['keyword_opportunities']]
     for noise in ['would', 'getting', 'thank', 'really', 'like']:
-        assert noise not in terms, f'gurultu kelimesi elenmemis: {noise}'
+        assert noise not in terms, f'noise word not filtered: {noise}'
 
 
 def test_percent_is_share_of_reviews():
@@ -156,7 +156,7 @@ def test_percent_is_share_of_reviews():
 
 
 # --------------------------------------------------------------------------
-# Listeleme kelimeleri
+# Listing keywords
 # --------------------------------------------------------------------------
 
 def test_listing_keywords_reflect_description():
@@ -166,11 +166,11 @@ def test_listing_keywords_reflect_description():
     terms = [k['term'] for k in report['listing_keywords']]
     assert 'music' in terms
     top = report['listing_keywords'][0]
-    assert top['term'] == 'music', 'en sik gecen listeleme kelimesi basta olmali'
+    assert top['term'] == 'music', 'the most frequent listing word should lead'
 
 
 # --------------------------------------------------------------------------
-# Kenar durumlar
+# Edge cases
 # --------------------------------------------------------------------------
 
 def test_no_reviews_still_returns_metadata():
@@ -193,7 +193,7 @@ def test_missing_description_does_not_crash():
 
 
 def test_non_english_language_still_produces_gap():
-    """POS etiketleyici yalnizca Ingilizce; diger dillerde stopword filtresine duser."""
+    """The POS tagger is English only; other languages fall back to stopwords."""
     stats = _stats(description='Müzik dinleme uygulaması.')
     reviews = _reviews(['alarm özelliği çok iyi', 'alarm kurulumu kolay', 'alarm lazım'])
 
@@ -203,7 +203,7 @@ def test_non_english_language_still_produces_gap():
 
 
 def test_noun_filter_degrades_gracefully_without_tagger(monkeypatch):
-    """Etiketleyici yoksa token'lar oldugu gibi donmeli, hata firlamamali."""
+    """Without a tagger the tokens come back unchanged, with no exception."""
     import nltk
     monkeypatch.setattr(nltk, 'pos_tag', lambda *a, **k: (_ for _ in ()).throw(LookupError('no tagger')))
 
@@ -217,7 +217,7 @@ def test_noun_filter_skipped_for_non_english():
 
 
 # --------------------------------------------------------------------------
-# Pipeline ve route entegrasyonu
+# Pipeline and route integration
 # --------------------------------------------------------------------------
 
 def test_build_app_report_includes_aso(monkeypatch):
@@ -231,15 +231,15 @@ def test_build_app_report_includes_aso(monkeypatch):
 
 
 def test_aso_computed_even_when_no_complaints(monkeypatch):
-    """ASO sikayet filtresinden bagimsizdir."""
+    """ASO ignores the complaint filter."""
     stats = _stats()
     reviews = _reviews(['alarm feature', 'alarm again'])  # hepsi 3 puan
     monkeypatch.setattr(analyzer, 'fetch_reviews_store', lambda *a: (reviews.copy(), stats))
 
     report = analyzer.build_app_report('com.x', 'x', 'us', 'en', 50,
                                        complaint_threshold=1, top_words=10)
-    assert report['error'] is not None, 'sikayet bulunmamali'
-    assert report['aso']['available'] is True, 'ASO yine de hesaplanmali'
+    assert report['error'] is not None, 'no complaints expected'
+    assert report['aso']['available'] is True, 'ASO should still be computed'
 
 
 def test_results_page_renders_aso_section(client, patched_fetch):
@@ -253,6 +253,6 @@ def test_results_page_renders_aso_section(client, patched_fetch):
     assert resp.status_code == 200
     assert 'ASO — Store Listing Optimization' in body
     assert 'Keyword opportunities' in body
-    # ASO kendi sekmesinde yer alir
+    # ASO lives in its own tab
     assert 'data-tab="aso"' in body
     assert 'data-panel="aso"' in body

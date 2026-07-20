@@ -1,4 +1,4 @@
-"""Çok dilli sentiment ve tema analizi testleri."""
+"""Tests for multilingual sentiment and theme detection."""
 import pandas as pd
 import pytest
 
@@ -6,7 +6,7 @@ from reviewMetrix import analyzer
 
 
 # --------------------------------------------------------------------------
-# Dil desteği bayrağı
+# Language support flag
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize('lang', ['en', 'tr', 'de', 'es', 'fr', 'EN', 'Tr'])
@@ -21,13 +21,13 @@ def test_unsupported_languages(lang):
 
 @pytest.mark.parametrize('lang', ['', None])
 def test_missing_language_defaults_to_english(lang):
-    """Dil verilmediğinde pipeline genelinde İngilizce varsayılır
-    (get_sentiment ve get_theme_keywords ile tutarlı)."""
+    """With no language the pipeline assumes English, consistent with
+    get_sentiment and get_theme_keywords."""
     assert analyzer.is_sentiment_supported(lang) is True
 
 
 # --------------------------------------------------------------------------
-# Sentiment: olumsuz yorumlar negatif skor almalı
+# Sentiment: negative reviews must score negative
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize('lang,text', [
@@ -39,7 +39,7 @@ def test_missing_language_defaults_to_english(lang):
 ])
 def test_negative_reviews_score_negative(lang, text):
     score = analyzer.get_sentiment(text, lang)
-    assert score < -0.2, f'{lang}: beklenen negatif, gelen {score}'
+    assert score < -0.2, f'{lang}: expected negative, got {score}'
 
 
 @pytest.mark.parametrize('lang,text', [
@@ -51,14 +51,14 @@ def test_negative_reviews_score_negative(lang, text):
 ])
 def test_positive_reviews_score_positive(lang, text):
     score = analyzer.get_sentiment(text, lang)
-    assert score > 0.2, f'{lang}: beklenen pozitif, gelen {score}'
+    assert score > 0.2, f'{lang}: expected positive, got {score}'
 
 
 def test_regression_non_english_no_longer_silently_neutral():
-    """Eski davranış: TextBlob İngilizce dışında her yoruma 0.0 dönüyordu."""
+    """Old behaviour: TextBlob returned 0.0 for every non-English review."""
     harsh_turkish = 'Uygulama berbat, sürekli çöküyor!'
     assert analyzer.get_sentiment(harsh_turkish, 'tr') < -0.2
-    # TextBlob yolu (İngilizce varsayımı) hâlâ 0.0 döner — sorunun kaynağı buydu
+    # The TextBlob path still returns 0.0, which was the root of the problem
     assert analyzer.get_sentiment(harsh_turkish, 'en') == 0.0
 
 
@@ -77,7 +77,7 @@ def test_sentiment_is_bounded():
 
 
 # --------------------------------------------------------------------------
-# Olumsuzlama
+# Negation
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize('lang,text', [
@@ -86,12 +86,12 @@ def test_sentiment_is_bounded():
     ('fr', "Ce n est pas bon"),
 ])
 def test_negation_flips_polarity(lang, text):
-    """'iyi/gut/bon' olumlu, olumsuzlama ile negatife dönmeli."""
+    """"iyi"/"gut"/"bon" are positive; negation must flip them."""
     assert analyzer.get_sentiment(text, lang) < 0
 
 
 def test_negation_only_applies_within_window():
-    """Olumsuzlama uzaktaki kelimeyi etkilememeli."""
+    """Negation must not reach a distant word."""
     near = analyzer.get_sentiment('nicht gut', 'de')
     far = analyzer.get_sentiment('nicht ist das wirklich sehr gut', 'de')
     assert near < 0
@@ -99,7 +99,7 @@ def test_negation_only_applies_within_window():
 
 
 # --------------------------------------------------------------------------
-# Çok dilli tema tespiti
+# Multilingual theme detection
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize('lang,text,expected', [
@@ -114,18 +114,18 @@ def test_negation_only_applies_within_window():
 def test_themes_detected_per_language(lang, text, expected):
     df = pd.DataFrame({'review': [text]})
     found = {t['theme'] for t in analyzer.categorize_complaints(df, lang)}
-    assert expected <= found, f'{lang}: beklenen {expected}, bulunan {found}'
+    assert expected <= found, f'{lang}: expected {expected}, found {found}'
 
 
 def test_regression_non_english_themes_were_missed():
-    """Eski davranış: İngilizce dışı yorumlarda hiçbir tema bulunamıyordu."""
+    """Old behaviour: no theme was ever detected in a non-English review."""
     df = pd.DataFrame({'review': ['Uygulama sürekli çöküyor ve çok yavaş']})
-    assert analyzer.categorize_complaints(df, 'en') == []      # eski yol
-    assert analyzer.categorize_complaints(df, 'tr') != []      # düzeltilmiş yol
+    assert analyzer.categorize_complaints(df, 'en') == []      # the old path
+    assert analyzer.categorize_complaints(df, 'tr') != []      # the fixed path
 
 
 def test_english_keywords_still_matched_in_other_languages():
-    """Yorumlar sık sık İngilizce terim içerir; her iki liste de aranmalı."""
+    """Reviews often mix in English terms, so both lists must be searched."""
     df = pd.DataFrame({'review': ['Uygulamada sürekli crash var']})
     found = {t['theme'] for t in analyzer.categorize_complaints(df, 'tr')}
     assert 'Crashes & Bugs' in found
@@ -133,8 +133,8 @@ def test_english_keywords_still_matched_in_other_languages():
 
 def test_get_theme_keywords_merges_language_with_english():
     tr = analyzer.get_theme_keywords('tr')
-    assert 'crash' in tr['Crashes & Bugs']      # İngilizce
-    assert 'çöküyor' in tr['Crashes & Bugs']    # Türkçe
+    assert 'crash' in tr['Crashes & Bugs']      # English
+    assert 'çöküyor' in tr['Crashes & Bugs']    # Turkish
 
     en = analyzer.get_theme_keywords('en')
     assert 'çöküyor' not in en['Crashes & Bugs']
@@ -146,7 +146,7 @@ def test_get_theme_keywords_unknown_language_falls_back_to_english():
 
 
 # --------------------------------------------------------------------------
-# Pipeline entegrasyonu
+# Pipeline integration
 # --------------------------------------------------------------------------
 
 def _turkish_df():
@@ -170,13 +170,13 @@ def test_pipeline_uses_language_for_sentiment_and_themes():
     df = _turkish_df()
     complaints = analyzer.preprocess_and_filter_complaints(df, 2, 'mockapp', 'tr')
 
-    # Türkçe sentiment hesaplanmış olmalı (hepsi 0.0 değil)
-    assert (complaints['sentiment'] != 0).any(), 'Türkçe sentiment hesaplanmadı'
+    # Turkish sentiment should have been computed, not left at 0.0
+    assert (complaints['sentiment'] != 0).any(), 'Turkish sentiment was not computed'
 
     result = analyzer.analyze_and_visualize(complaints, top_n=10)
     assert result['sentiment_available'] is True
     assert result['lang_code'] == 'tr'
-    assert result['themes'], 'Türkçe temalar bulunmalı'
+    assert result['themes'], 'Turkish themes should be found'
 
 
 def test_pipeline_flags_unsupported_language():
@@ -189,7 +189,7 @@ def test_pipeline_flags_unsupported_language():
 
 
 def test_analyze_lang_code_falls_back_to_preprocess_value():
-    """analyze_and_visualize'a dil verilmezse preprocess'in iliştirdiği kullanılmalı."""
+    """Without an explicit language, the one attached during preprocessing wins."""
     df = _turkish_df()
     complaints = analyzer.preprocess_and_filter_complaints(df, 2, 'mockapp', 'de')
     result = analyzer.analyze_and_visualize(complaints, top_n=10)  # lang_code verilmedi
@@ -217,7 +217,7 @@ def test_build_app_report_unsupported_language_flag(monkeypatch):
 
 
 # --------------------------------------------------------------------------
-# Arayüz dürüstlüğü: desteklenmeyen dilde sentiment bölümleri gizlenmeli
+# UI honesty: sentiment sections hide for unsupported languages
 # --------------------------------------------------------------------------
 
 def _analyze_form(**over):

@@ -1,7 +1,7 @@
-"""Paylaşılan pytest fixture'ları.
+"""Shared pytest fixtures.
 
-Tüm testler ağ erişimi olmadan çalışır: mağaza scraping'i yapan
-fetch_reviews_store fonksiyonu testlerde monkeypatch ile değiştirilir.
+Every test runs without network access: fetch_reviews_store, which does the
+store scraping, is monkeypatched out.
 """
 import pandas as pd
 import pytest
@@ -11,10 +11,10 @@ from reviewMetrix import create_app
 
 @pytest.fixture(autouse=True)
 def clear_cache():
-    """Her testten önce/sonra scraping cache'ini boşaltır.
+    """Empty the scraping cache before and after every test.
 
-    Cache modül düzeyinde yaşadığı için temizlenmezse bir testin sahte verisi
-    başka bir teste sızar ve monkeypatch'ler etkisiz kalır.
+    The cache lives at module level, so without this one test's mock data
+    leaks into another and the monkeypatches silently stop mattering.
     """
     from reviewMetrix import analyzer
     analyzer.clear_review_cache()
@@ -24,7 +24,7 @@ def clear_cache():
 
 @pytest.fixture
 def app():
-    """Test için Flask uygulaması."""
+    """Flask app under test."""
     application = create_app()
     application.config.update(TESTING=True)
     return application
@@ -37,7 +37,7 @@ def client(app):
 
 @pytest.fixture
 def reviews_df():
-    """İki platformdan, farklı puan/tarih/sürümlere sahip örnek yorum seti."""
+    """Sample reviews from both platforms, across ratings, dates and versions."""
     return pd.DataFrame({
         'review': [
             'App keeps crashing after the update',
@@ -64,8 +64,8 @@ def reviews_df():
 
 @pytest.fixture
 def summary_stats():
-    # description_full ASO ve rakip listeleme analizinin kullandigi alandir;
-    # gercek veride her zaman bulunur
+    # description_full is what the ASO and competitor listing analysis read;
+    # real payloads always carry it
     google_desc = 'A mock app for listening to music, podcasts and audiobooks offline.'
     ios_desc = 'A mock app with playlists, radio stations and offline downloads.'
     return {
@@ -85,7 +85,7 @@ def summary_stats():
 
 @pytest.fixture
 def patched_fetch(monkeypatch, reviews_df, summary_stats):
-    """fetch_reviews_store'u ağ erişimi olmadan sabit veri döndürecek şekilde değiştirir."""
+    """Replace fetch_reviews_store with fixed data, so no network is needed."""
     from reviewMetrix import analyzer
 
     def fake_fetch(google_id, apple_name, country, lang, max_reviews):
