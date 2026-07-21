@@ -412,6 +412,31 @@ def get_response_analysis(df, lang_code='en'):
     return result
 
 
+def get_listing_strength(summary_stats):
+    """Summarise an app's store-listing strength for a head-to-head comparison.
+
+    Title and description use the longer of the two stores (the best case the
+    app targets); rating is the store average and reviews the combined volume.
+    """
+    stats = summary_stats or {}
+    stores = [stats[k] for k in ('google', 'ios') if stats.get(k)]
+    if not stores:
+        return None
+
+    def longest(field):
+        return max((len(s.get(field) or '') for s in stores), default=0)
+
+    ratings = [s['rating'] for s in stores if s.get('rating')]
+    return {
+        'title_length': longest('title'),
+        'title_limit': ASO_LIMITS['google']['title'],
+        'description_length': longest('description_full'),
+        'description_limit': ASO_LIMITS['google']['description'],
+        'rating': round(sum(ratings) / len(ratings), 2) if ratings else 0.0,
+        'reviews': sum(int(s.get('reviews') or 0) for s in stores),
+    }
+
+
 def get_competitor_keyword_gap(stats_a, stats_b, lang_code='en', top_n=12):
     """Compare two apps' store listings.
 

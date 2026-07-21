@@ -309,3 +309,46 @@ def test_compare_identical_listings_show_no_gap(client, patched_fetch):
     })
     assert resp.status_code == 200
     assert 'ASO Listing Gap' not in resp.data.decode()
+
+
+# ==========================================================================
+# ASO listing strength (competitor)
+# ==========================================================================
+
+def test_listing_strength_uses_longer_store_text():
+    stats = {
+        'google': {'title': 'Short', 'description_full': 'a' * 100,
+                   'rating': 4.0, 'reviews': 1000},
+        'ios': {'title': 'A Much Longer Title', 'description_full': 'a' * 500,
+                'rating': 4.4, 'reviews': 500},
+    }
+    s = analyzer.get_listing_strength(stats)
+
+    assert s['title_length'] == len('A Much Longer Title')  # the longer store wins
+    assert s['description_length'] == 500
+    assert s['rating'] == 4.2                                # (4.0 + 4.4) / 2
+    assert s['reviews'] == 1500                              # combined volume
+    assert s['title_limit'] == 30
+
+
+def test_listing_strength_none_without_stores():
+    assert analyzer.get_listing_strength(None) is None
+    assert analyzer.get_listing_strength({'google': None, 'ios': None}) is None
+
+
+def test_compare_page_renders_listing_strength(client, monkeypatch, reviews_df):
+    def fetch_by_app(google_id, apple_name, country, lang, max_reviews):
+        if google_id == 'com.mock.b':
+            return reviews_df.copy(), _stats(title='B', description='Watch videos.')
+        return reviews_df.copy(), _stats(title='Mock Music Player', description='Listen to podcasts and audiobooks.')
+
+    monkeypatch.setattr(analyzer, 'fetch_reviews_store', fetch_by_app)
+
+    resp = client.post('/compare', data={
+        'google_id': 'com.mock.app', 'apple_name': 'mockapp',
+        'google_id_b': 'com.mock.b', 'apple_name_b': 'mockb',
+        'country': 'us', 'language': 'en', 'max_reviews': '50',
+        'complaint_threshold': '2', 'top_words': '10',
+    })
+    assert resp.status_code == 200
+    assert 'ASO Listing Strength' in resp.data.decode()

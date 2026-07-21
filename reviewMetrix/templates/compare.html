@@ -533,6 +533,40 @@
             <div id="sentimentCompareChart"></div>
         </div>
 
+        {% if listing_a and listing_b %}
+        {% macro lead(a, b) %}{% if a > b %}a{% elif b > a %}b{% endif %}{% endmacro %}
+        <div class="metrics-card">
+            <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.3rem; margin: 0 0 10px 0;">
+                🔍 ASO Listing Strength
+                <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">who uses their listing better</span>
+            </h3>
+            {% set rows = [
+                ('Title length', listing_a.title_length, listing_b.title_length, listing_a.title_limit, 'limit'),
+                ('Description length', listing_a.description_length, listing_b.description_length, listing_a.description_limit, 'limit'),
+                ('Avg store rating', listing_a.rating, listing_b.rating, None, 'rating'),
+                ('Review volume', listing_a.reviews, listing_b.reviews, None, 'count'),
+            ] %}
+            {% for label, a, b, limit, kind in rows %}
+            {% set winner = lead(a, b)|trim %}
+            <div class="metric-row">
+                <div class="metric-val a">
+                    {% if kind == 'rating' %}⭐ {{ "%.2f"|format(a) }}
+                    {% elif kind == 'count' %}{{ "{:,}".format(a) }}
+                    {% else %}{{ a }}{% if limit %} <span class="sub" style="display:inline">/ {{ "{:,}".format(limit) }}</span>{% endif %}{% endif %}
+                    {% if winner == 'a' %}<span style="color: var(--green);">▲</span>{% endif %}
+                </div>
+                <div class="metric-label">{{ label }}</div>
+                <div class="metric-val b">
+                    {% if winner == 'b' %}<span style="color: var(--green);">▲</span>{% endif %}
+                    {% if kind == 'rating' %}⭐ {{ "%.2f"|format(b) }}
+                    {% elif kind == 'count' %}{{ "{:,}".format(b) }}
+                    {% else %}{{ b }}{% if limit %} <span class="sub" style="display:inline">/ {{ "{:,}".format(limit) }}</span>{% endif %}{% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         {% if keyword_gap and keyword_gap.available %}
         <div class="grid-card full" style="margin-bottom: 30px;">
             <h3>🔍 ASO Listing Gap

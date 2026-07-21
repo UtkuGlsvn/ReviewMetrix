@@ -92,9 +92,12 @@ def compare_apps():
         keyword_gap = analyzer.get_competitor_keyword_gap(
             app_a['summary_stats'], app_b['summary_stats'], params['language']
         )
+        listing_a = analyzer.get_listing_strength(app_a['summary_stats'])
+        listing_b = analyzer.get_listing_strength(app_b['summary_stats'])
 
         return render_template('compare.html', app_a=app_a, app_b=app_b,
-                               keyword_gap=keyword_gap)
+                               keyword_gap=keyword_gap,
+                               listing_a=listing_a, listing_b=listing_b)
     except Exception as e:
         print(f"A compare error occurred: {e}")
         return render_template('compare.html',
