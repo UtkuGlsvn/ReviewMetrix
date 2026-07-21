@@ -71,6 +71,12 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
             'description': gp_details.get('description', '')[:200] + '...' if gp_details.get('description') else 'No description',
             # ASO needs the full text; the truncated field above is for display only
             'description_full': gp_details.get('description', '') or '',
+            # Store creatives: the icon identifies the app, and screenshot count
+            # is itself an ASO signal since the store caps how many you may use
+            'icon': gp_details.get('icon'),
+            'screenshots': (gp_details.get('screenshots') or [])[:MAX_SCREENSHOTS],
+            'screenshot_count': len(gp_details.get('screenshots') or []),
+            'store_url': f'https://play.google.com/store/apps/details?id={google_id}',
         }
     except Exception as e:
         print(f"Google Play fetch error->: {e}")
@@ -93,6 +99,10 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
                 'released': app_data.get('releaseDate', 'Unknown')[:10] if app_data.get('releaseDate') else 'Unknown',
                 'description': app_data.get('description', '')[:200] + '...' if app_data.get('description') else 'No description',
                 'description_full': app_data.get('description', '') or '',
+                'icon': app_data.get('artworkUrl512') or app_data.get('artworkUrl100'),
+                'screenshots': (app_data.get('screenshotUrls') or [])[:MAX_SCREENSHOTS],
+                'screenshot_count': len(app_data.get('screenshotUrls') or []),
+                'store_url': app_data.get('trackViewUrl'),
             }
     except Exception as e:
         print(f"iTunes API Error ->: {e}")
@@ -124,6 +134,10 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
 # from memory instead of re-scraping. Multi-country comparison benefits most,
 # since it performs one scrape per market.
 # ---------------------------------------------------------------------------
+
+# Stores return far more screenshots than are useful to display (Google can
+# return 40+), so the gallery is capped.
+MAX_SCREENSHOTS = 8
 
 CACHE_TTL_SECONDS = 3600   # 1 hour
 CACHE_MAX_ENTRIES = 32     # bounds memory use; oldest entries are evicted
@@ -434,6 +448,7 @@ def get_listing_strength(summary_stats):
         'description_limit': ASO_LIMITS['google']['description'],
         'rating': round(sum(ratings) / len(ratings), 2) if ratings else 0.0,
         'reviews': sum(int(s.get('reviews') or 0) for s in stores),
+        'screenshots': max((int(s.get('screenshot_count') or 0) for s in stores), default=0),
     }
 
 
@@ -1092,6 +1107,7 @@ def _metadata_health(store_key, stats):
     description = stats.get('description_full') or ''
     rating = stats.get('rating') or 0
     review_count = stats.get('reviews') or 0
+    shot_count = int(stats.get('screenshot_count') or 0)
 
     title_len = len(title)
     desc_len = len(description)
@@ -1113,6 +1129,15 @@ def _metadata_health(store_key, stats):
         'rating_status': status(rating >= 4.0, rating >= 3.5),
         'reviews': int(review_count),
         'reviews_status': status(review_count >= 1000, review_count >= 100),
+        # Screenshots are merchandising space, and a listing with only one or
+        # two is under-using it. Reported as a plain count, not a ratio: Google
+        # returns every form factor mixed together, so the number cannot be
+        # read as "phone slots filled".
+        'screenshots': shot_count,
+        'screenshots_status': status(shot_count >= 4, shot_count >= 2),
+        'icon': stats.get('icon'),
+        'store_url': stats.get('store_url'),
+        'shots': stats.get('screenshots') or [],
     }
 
 

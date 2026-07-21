@@ -784,6 +784,60 @@
             vertical-align: middle;
         }
 
+        /* Store creatives: icon, store link, screenshot strip */
+        .app-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            margin-right: 10px;
+            vertical-align: middle;
+            border: 1px solid var(--card-border);
+        }
+
+        .store-link {
+            margin-left: auto;
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .store-link:hover {
+            color: var(--accent-primary);
+        }
+
+        .shot-strip {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 14px 0 4px;
+            margin-top: 6px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            scrollbar-width: thin;
+        }
+
+        /* Width is explicit, not auto: an unloaded image has no intrinsic size,
+           so `width: auto` collapsed every thumbnail to ~2px. The images also
+           carry no loading="lazy": they start inside a display:none tab panel,
+           where the lazy observer never fires and they stay blank even after
+           the tab is opened. object-fit keeps mixed phone/tablet shots tidy. */
+        .shot-strip img {
+            width: 88px;
+            height: 156px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 1px solid var(--card-border);
+            flex: 0 0 auto;
+            background: rgba(0, 0, 0, 0.25);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .shot-strip img:hover {
+            transform: scale(1.03);
+            border-color: var(--accent-primary);
+        }
+
         /* ASO section */
         .aso-meta-grid {
             display: grid;
@@ -1309,7 +1363,11 @@
         <div class="profile-grid">
             {% if summary_stats and summary_stats.google %}
             <div class="grid-card">
-                <h3 style="margin-bottom: 15px;"><span class="platform-tag google">Google Play</span></h3>
+                <h3 style="margin-bottom: 15px;">
+                    {% if summary_stats.google.icon %}<img src="{{ summary_stats.google.icon }}" alt="" class="app-icon">{% endif %}
+                    <span class="platform-tag google">Google Play</span>
+                    {% if summary_stats.google.store_url %}<a href="{{ summary_stats.google.store_url }}" target="_blank" rel="noopener noreferrer" class="store-link">View in store ↗</a>{% endif %}
+                </h3>
                 <div class="profile-details">
                     <p><strong>App Name:</strong> <span>{{ summary_stats.google.title }}</span></p>
                     <p><strong>Developer:</strong> <span>{{ summary_stats.google.developer }}</span></p>
@@ -1326,7 +1384,11 @@
 
             {% if summary_stats and summary_stats.ios %}
             <div class="grid-card">
-                <h3 style="margin-bottom: 15px;"><span class="platform-tag ios">App Store</span></h3>
+                <h3 style="margin-bottom: 15px;">
+                    {% if summary_stats.ios.icon %}<img src="{{ summary_stats.ios.icon }}" alt="" class="app-icon">{% endif %}
+                    <span class="platform-tag ios">App Store</span>
+                    {% if summary_stats.ios.store_url %}<a href="{{ summary_stats.ios.store_url }}" target="_blank" rel="noopener noreferrer" class="store-link">View in store ↗</a>{% endif %}
+                </h3>
                 <div class="profile-details">
                     <p><strong>App Name:</strong> <span>{{ summary_stats.ios.title }}</span></p>
                     <p><strong>Developer:</strong> <span>{{ summary_stats.ios.developer }}</span></p>
@@ -1600,6 +1662,20 @@
                         <span>Review volume</span>
                         <strong class="st-{{ m.reviews_status }}">{{ "{:,}".format(m.reviews) }}</strong>
                     </div>
+                    <div class="aso-check">
+                        <span>Screenshots</span>
+                        <strong class="st-{{ m.screenshots_status }}">{{ m.screenshots }}</strong>
+                    </div>
+
+                    {% if m.shots %}
+                    <div class="shot-strip">
+                        {% for url in m.shots %}
+                        <a href="{{ url }}" target="_blank" rel="noopener noreferrer">
+                            <img src="{{ url }}" alt="Store screenshot">
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>

@@ -116,6 +116,14 @@
             border-top: 3px solid var(--accent-b);
         }
 
+        .vs-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 11px;
+            border: 1px solid var(--card-border);
+            margin-bottom: 10px;
+        }
+
         .vs-app h2 {
             font-family: 'Outfit', sans-serif;
             margin: 0 0 6px 0;
@@ -455,6 +463,8 @@
         <!-- Versus header -->
         <div class="vs-header">
             <div class="vs-app a">
+                {% set ic_a = (app_a.summary_stats.google.icon if app_a.summary_stats and app_a.summary_stats.google else None) or (app_a.summary_stats.ios.icon if app_a.summary_stats and app_a.summary_stats.ios else None) %}
+                {% if ic_a %}<img src="{{ ic_a }}" alt="" class="vs-icon">{% endif %}
                 <h2 style="color: var(--accent-a);">{{ app_a.name }}</h2>
                 <div class="dev">
                     {% if app_a.summary_stats and app_a.summary_stats.google %}{{ app_a.summary_stats.google.developer }}
@@ -464,6 +474,8 @@
             </div>
             <div class="vs-badge">VS</div>
             <div class="vs-app b">
+                {% set ic_b = (app_b.summary_stats.google.icon if app_b.summary_stats and app_b.summary_stats.google else None) or (app_b.summary_stats.ios.icon if app_b.summary_stats and app_b.summary_stats.ios else None) %}
+                {% if ic_b %}<img src="{{ ic_b }}" alt="" class="vs-icon">{% endif %}
                 <h2 style="color: var(--accent-b);">{{ app_b.name }}</h2>
                 <div class="dev">
                     {% if app_b.summary_stats and app_b.summary_stats.google %}{{ app_b.summary_stats.google.developer }}
@@ -545,6 +557,7 @@
                 ('Description length', listing_a.description_length, listing_b.description_length, listing_a.description_limit, 'limit'),
                 ('Avg store rating', listing_a.rating, listing_b.rating, None, 'rating'),
                 ('Review volume', listing_a.reviews, listing_b.reviews, None, 'count'),
+                ('Screenshots', listing_a.screenshots, listing_b.screenshots, None, 'plain'),
             ] %}
             {% for label, a, b, limit, kind in rows %}
             {% set winner = lead(a, b)|trim %}

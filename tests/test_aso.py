@@ -256,3 +256,53 @@ def test_results_page_renders_aso_section(client, patched_fetch):
     # ASO lives in its own tab
     assert 'data-tab="aso"' in body
     assert 'data-panel="aso"' in body
+
+
+# --------------------------------------------------------------------------
+# Store creatives (icon, screenshots)
+# --------------------------------------------------------------------------
+
+def test_metadata_reports_screenshot_count_and_icon():
+    stats = _stats()
+    stats['google'].update({
+        'icon': 'https://example.test/icon.png',
+        'screenshots': ['https://example.test/1.png', 'https://example.test/2.png'],
+        'screenshot_count': 6,
+        'store_url': 'https://play.google.com/store/apps/details?id=x',
+    })
+    meta = analyzer.get_aso_report(stats, _reviews(['x']), 'en')['metadata'][0]
+
+    assert meta['screenshots'] == 6
+    assert meta['screenshots_status'] == 'good'
+    assert meta['icon'] == 'https://example.test/icon.png'
+    assert len(meta['shots']) == 2
+    assert meta['store_url'].startswith('https://play.google.com')
+
+
+@pytest.mark.parametrize('count,expected', [
+    (0, 'bad'), (1, 'bad'), (2, 'warn'), (3, 'warn'), (4, 'good'), (40, 'good'),
+])
+def test_screenshot_status_thresholds(count, expected):
+    """A listing with one or two screenshots is under-using merchandising space."""
+    stats = _stats()
+    stats['google']['screenshot_count'] = count
+    meta = analyzer.get_aso_report(stats, _reviews(['x']), 'en')['metadata'][0]
+    assert meta['screenshots_status'] == expected
+
+
+def test_metadata_handles_missing_creatives():
+    """Older cached payloads carry no image fields; that must not crash."""
+    meta = analyzer.get_aso_report(_stats(), _reviews(['x']), 'en')['metadata'][0]
+    assert meta['screenshots'] == 0
+    assert meta['icon'] is None
+    assert meta['shots'] == []
+
+
+def test_listing_strength_reports_screenshot_count():
+    stats = {
+        'google': {'title': 'A', 'description_full': 'x', 'rating': 4.0,
+                   'reviews': 10, 'screenshot_count': 3},
+        'ios': {'title': 'A', 'description_full': 'x', 'rating': 4.0,
+                'reviews': 10, 'screenshot_count': 8},
+    }
+    assert analyzer.get_listing_strength(stats)['screenshots'] == 8
