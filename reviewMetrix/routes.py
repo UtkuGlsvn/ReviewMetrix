@@ -1,7 +1,28 @@
 from flask import Blueprint, request, render_template
 from . import analyzer
+from .ratelimit import limiter, client_ip
 
 main_bp = Blueprint('main', __name__)
+
+
+def _check_rate_limit(template, cost):
+    """Charge `cost` scrape units to the caller.
+
+    Returns None when allowed, or a rendered 429 response to return as-is.
+    """
+    allowed, remaining, retry_after = limiter.check(client_ip(request), cost)
+    if allowed:
+        return None
+
+    minutes = max(1, round(retry_after / 60))
+    response = render_template(
+        template,
+        error=(f"Rate limit reached. This instance allows {limiter.limit} scrapes "
+               f"per hour per IP to stay within what the app stores tolerate. "
+               f"Try again in about {minutes} minute{'s' if minutes != 1 else ''}."),
+        summary_stats=None,
+    )
+    return response, 429, {'Retry-After': str(retry_after)}
 
 
 @main_bp.route('/')
@@ -26,6 +47,9 @@ def _parse_common_params():
 
 @main_bp.route('/analyze', methods=['POST'])
 def analyze_reviews():
+    limited = _check_rate_limit('results.html', cost=1)
+    if limited:
+        return limited
     try:
         params = _parse_common_params()
         report = analyzer.build_app_report(
@@ -71,6 +95,9 @@ def analyze_reviews():
 @main_bp.route('/compare', methods=['POST'])
 def compare_apps():
     """Analyse two apps side by side."""
+    limited = _check_rate_limit('compare.html', cost=2)  # two apps, two scrapes
+    if limited:
+        return limited
     try:
         params = _parse_common_params()
 
@@ -136,6 +163,11 @@ def compare_countries():
         if not countries:
             return render_template('compare_countries.html',
                                    error="Please provide at least one country code (e.g. us, gb, de).")
+
+        # Charged once the country list is known: each market is its own scrape
+        limited = _check_rate_limit('compare_countries.html', cost=len(countries))
+        if limited:
+            return limited
 
         reports = []
         for code in countries:

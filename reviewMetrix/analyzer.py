@@ -1,6 +1,7 @@
 # reviewMetrix/analyzer.py
 import pandas as pd
 from nltk.corpus import stopwords
+import os
 import re
 import time
 import copy
@@ -139,8 +140,11 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
 # return 40+), so the gallery is capped.
 MAX_SCREENSHOTS = 8
 
-CACHE_TTL_SECONDS = 3600   # 1 hour
-CACHE_MAX_ENTRIES = 32     # bounds memory use; oldest entries are evicted
+CACHE_TTL_SECONDS = int(os.environ.get('CACHE_TTL_SECONDS', 3600))  # 1 hour
+# Bounds memory use; oldest entries are evicted. Each entry holds a DataFrame,
+# so this is the main memory dial: measured at ~126 MB idle and ~326 MB with a
+# warm cache, which matters on a 512 MB free tier.
+CACHE_MAX_ENTRIES = int(os.environ.get('CACHE_MAX_ENTRIES', 32))
 
 _review_cache = OrderedDict()  # key -> (timestamp, DataFrame, summary_stats)
 _cache_lock = threading.Lock()

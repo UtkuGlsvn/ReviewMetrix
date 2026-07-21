@@ -34,16 +34,19 @@ USER appuser
 
 EXPOSE 8000
 
-# Scraping is I/O-bound and slow, so threads are worth more than processes here.
+# One worker with threads, not multiple processes. Two reasons:
+#   - memory: measured ~126 MB idle and ~326 MB with a warm cache, so two
+#     workers would not fit the 512 MB a typical free tier gives you
+#   - the review cache and the rate limiter both live in process memory, so
+#     each extra worker gets its own copy: more cache misses, and an effective
+#     rate limit multiplied by the worker count
+# Scraping is I/O-bound, so threads carry concurrency perfectly well here.
+#
 # The timeout is generous on purpose: a 6-country comparison performs six
 # sequential scrapes and would be killed by gunicorn's 30s default.
-#
-# Note: the review cache lives in process memory, so each worker keeps its own.
-# More workers means more cache misses; a shared store would be needed to fix
-# that properly.
 CMD ["gunicorn", "run:app", \
      "--bind", "0.0.0.0:8000", \
-     "--workers", "2", \
-     "--threads", "4", \
+     "--workers", "1", \
+     "--threads", "8", \
      "--timeout", "180", \
      "--access-logfile", "-"]

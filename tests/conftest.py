@@ -11,15 +11,19 @@ from reviewMetrix import create_app
 
 @pytest.fixture(autouse=True)
 def clear_cache():
-    """Empty the scraping cache before and after every test.
+    """Empty the scraping cache and rate limiter before and after every test.
 
-    The cache lives at module level, so without this one test's mock data
-    leaks into another and the monkeypatches silently stop mattering.
+    Both live at module level, so without this one test's mock data leaks into
+    another and the monkeypatches silently stop mattering, and requests from
+    earlier tests count against the limit in later ones.
     """
     from reviewMetrix import analyzer
+    from reviewMetrix.ratelimit import limiter
     analyzer.clear_review_cache()
+    limiter.reset()
     yield
     analyzer.clear_review_cache()
+    limiter.reset()
 
 
 @pytest.fixture

@@ -87,6 +87,7 @@ ReviewMetrix/
 │   ├── __init__.py                  # Application factory, NLTK bootstrap
 │   ├── routes.py                    # /, /analyze, /compare, /compare-countries
 │   ├── analyzer.py                  # Scraping, caching, analysis, ASO
+│   ├── ratelimit.py                 # Per-IP scrape budget
 │   └── templates/
 │       ├── index.html               # Input form
 │       ├── results.html             # Single-app dashboard
@@ -143,17 +144,57 @@ Available at <http://127.0.0.1:4999>.
 | --- | --- | --- |
 | `FLASK_DEBUG` | `0` | Set to `1` for the interactive debugger. Leave off outside local development. |
 | `PORT` | `4999` | Port to bind. |
+| `RATE_LIMIT_MAX` | `30` | Scrape units allowed per IP per window. |
+| `RATE_LIMIT_WINDOW` | `3600` | Rate-limit window in seconds. |
+| `TRUST_PROXY` | unset | Set to `1` only when behind a proxy that rewrites `X-Forwarded-For`. |
+| `CACHE_TTL_SECONDS` | `3600` | How long scraped reviews stay cached. |
+| `CACHE_MAX_ENTRIES` | `32` | Cached scrapes kept in memory. The main memory dial. |
+
+### Rate limiting
+
+The scraping routes are limited per IP, because the stores rate-limit and
+eventually block callers. The limiter counts **scrape units, not requests**: a
+single analysis costs 1, a competitor comparison costs 2, and a six-country
+comparison costs 6. Over-budget requests are rejected whole with a `429` and a
+`Retry-After` header, and rejected attempts are not recorded, so retrying while
+blocked cannot push your own reset further away.
+
+`X-Forwarded-For` is ignored unless `TRUST_PROXY=1`, since any client can set
+that header and would otherwise mint a fresh IP per request.
+
+The counters live in process memory. With more than one worker each gets its
+own, so the effective limit multiplies by the worker count — see the note on
+workers below.
 
 `run.py` uses the Werkzeug development server. For anything beyond local use,
 serve the same `run:app` entrypoint with gunicorn:
 
 ```bash
-gunicorn run:app --bind 0.0.0.0:8000 --workers 2 --threads 4 --timeout 180
+gunicorn run:app --bind 0.0.0.0:8000 --workers 1 --threads 8 --timeout 180
 ```
 
-Scraping is I/O-bound and slow, so threads buy more than processes here. The
-long timeout is deliberate: a six-country comparison performs six sequential
-scrapes and would be killed by gunicorn's 30-second default.
+One worker with threads, not several processes. Scraping is I/O-bound so
+threads carry the concurrency, and both the review cache and the rate-limit
+counters live in process memory — every extra worker gets its own copy, which
+means more cache misses and an effective rate limit multiplied by the worker
+count. The long timeout is deliberate: a six-country comparison performs six
+sequential scrapes and would be killed by gunicorn's 30-second default.
+
+### Hosting notes
+
+This is a server-side app: it runs Python on every request. **GitHub Pages
+cannot host it** — Pages serves static files only. Anything that runs a Python
+process works (Render, Fly.io, Railway, Koyeb, PythonAnywhere, Hugging Face
+Spaces).
+
+Measured memory on this app: **~126 MB idle, ~326 MB with a warm cache.** A
+512 MB free tier fits one worker; lower `CACHE_MAX_ENTRIES` if you need more
+headroom.
+
+One risk worth knowing before you deploy publicly: the stores block datacenter
+IP ranges far more readily than residential ones, so scraping that works from a
+laptop can return 403s or empty results from a cloud host. Rate limiting
+reduces the pressure but does not remove that risk.
 
 ### Docker
 
@@ -203,7 +244,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-194 tests covering:
+222 tests covering:
 
 - `tests/test_analyzer.py` — rating distribution, theme categorization, platform comparison, date-range filtering, trending keywords, version breakdown, sentiment, preprocessing, and the `build_app_report` pipeline including every error branch.
 - `tests/test_routes.py` — all four routes, error paths, the date-filter badge, country de-duplication and the 6-country cap, and partial failures where one app or market returns no data.
@@ -212,6 +253,7 @@ pytest
 - `tests/test_aso.py` — listing health thresholds, keyword gap, phrase detection, noise filtering, and graceful fallback without the POS tagger.
 - `tests/test_priorities.py` — momentum thresholds and per-platform scoping, priority ranking against raw volume, likes as affected users, and review ordering.
 - `tests/test_responses.py` — reply rates, median reply time, per-theme gaps, competitor keyword gap, and the POS context fix.
+- `tests/test_ratelimit.py` — window mechanics, per-unit costs, rejected requests not being recorded, IP isolation, stale-key eviction and the X-Forwarded-For trust boundary.
 
 Test data is deliberately discriminating — ordering fixtures use unequal counts
 so sort direction is actually asserted, rather than passing vacuously.
