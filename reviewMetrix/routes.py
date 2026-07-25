@@ -30,15 +30,31 @@ def index():
     return render_template('index.html')
 
 
+# Hard ceilings enforced server-side. The form has matching min/max attributes,
+# but those only guide the browser; a crafted POST can send anything. An
+# unbounded max_reviews is the dangerous one: it costs a single rate-limit unit
+# yet drives an arbitrarily large scrape and can exhaust memory on a small host.
+MAX_REVIEWS_CAP = 1000
+TOP_WORDS_CAP = 100
+
+
+def _clamp(value, low, high, default):
+    """Coerce a form value to int and clamp it; fall back to default if unparsable."""
+    try:
+        return max(low, min(high, int(value)))
+    except (TypeError, ValueError):
+        return default
+
+
 def _parse_common_params():
-    """Read and coerce the form fields shared by every route."""
+    """Read, coerce and bound the form fields shared by every route."""
     return {
-        'country': request.form['country'],
-        'language': request.form['language'],
-        'max_reviews': int(request.form['max_reviews']),
-        'complaint_threshold': int(request.form['complaint_threshold']),
-        'top_words': int(request.form['top_words']),
-        'extra_stopwords_str': request.form.get('extra_stopwords', ''),
+        'country': (request.form.get('country', '') or 'us').strip()[:5],
+        'language': (request.form.get('language', '') or 'en').strip()[:5],
+        'max_reviews': _clamp(request.form.get('max_reviews'), 10, MAX_REVIEWS_CAP, 100),
+        'complaint_threshold': _clamp(request.form.get('complaint_threshold'), 1, 5, 2),
+        'top_words': _clamp(request.form.get('top_words'), 1, TOP_WORDS_CAP, 20),
+        'extra_stopwords_str': request.form.get('extra_stopwords', '')[:2000],
         'start_date': request.form.get('start_date', '').strip() or None,
         'end_date': request.form.get('end_date', '').strip() or None,
         'force_refresh': request.form.get('force_refresh') is not None,

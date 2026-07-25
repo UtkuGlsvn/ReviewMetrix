@@ -72,8 +72,19 @@ def test_analyze_without_dates_hides_badge(client, patched_fetch):
     assert 'Date filter active' not in resp.data.decode()
 
 
-def test_analyze_reports_error_when_no_complaints(client, patched_fetch):
-    resp = client.post('/analyze', data=form(complaint_threshold='0'))
+def test_analyze_reports_error_when_no_complaints(client, monkeypatch, summary_stats):
+    """When every review sits above the threshold, the no-complaints notice shows."""
+    import pandas as pd
+    from reviewMetrix import analyzer
+    high = pd.DataFrame({
+        'review': ['love it', 'great app'], 'score': [5, 5],
+        'date': pd.to_datetime(['2024-01-01', '2024-01-02']),
+        'platform': ['Google Play', 'App Store'], 'version': [None, None],
+        'likes': [0, 0], 'reply': [None, None], 'replied_at': [None, None],
+    })
+    monkeypatch.setattr(analyzer, 'fetch_reviews_store', lambda *a: (high, summary_stats))
+
+    resp = client.post('/analyze', data=form(complaint_threshold='2'))
     assert resp.status_code == 200
     assert 'No complaint reviews were found' in resp.data.decode()
 
@@ -89,10 +100,29 @@ def test_analyze_reports_error_when_no_reviews(client, monkeypatch):
 
 
 def test_analyze_handles_invalid_number_gracefully(client, patched_fetch):
-    """Malformed numeric input should render an error page, not a 500."""
+    """Malformed numeric input falls back to the default and still renders."""
     resp = client.post('/analyze', data=form(max_reviews='not-a-number'))
     assert resp.status_code == 200
-    assert 'unexpected error occurred' in resp.data.decode()
+    body = resp.data.decode()
+    assert 'unexpected error occurred' not in body
+    assert 'Reviews Scraped' in body
+
+
+def test_analyze_clamps_oversized_review_count(client, monkeypatch, summary_stats, reviews_df):
+    """A crafted max_reviews cannot drive an unbounded scrape."""
+    from reviewMetrix import analyzer
+    from reviewMetrix.routes import MAX_REVIEWS_CAP
+    seen = {}
+
+    def capture(google_id, apple_name, country, lang, max_reviews):
+        seen['max_reviews'] = max_reviews
+        return reviews_df.copy(), summary_stats
+
+    monkeypatch.setattr(analyzer, 'fetch_reviews_store', capture)
+
+    resp = client.post('/analyze', data=form(max_reviews='500000'))
+    assert resp.status_code == 200
+    assert seen['max_reviews'] == MAX_REVIEWS_CAP
 
 
 # --------------------------------------------------------------------------
