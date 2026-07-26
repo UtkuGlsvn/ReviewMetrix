@@ -301,6 +301,23 @@
             margin-top: 20px;
         }
 
+        .validation-hint {
+            display: none;
+            color: #f59e0b;
+            font-size: 0.85rem;
+            margin: 10px 0 0 0;
+            font-weight: 500;
+        }
+
+        .validation-hint.show {
+            display: block;
+        }
+
+        input.field-error {
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+        }
+
         .checkbox-row {
             grid-column: 1 / -1;
             display: flex;
@@ -482,6 +499,7 @@
                         </div>
                     </div>
                     <p class="info-text">Fill these in, then use the <strong>Compare Two Apps</strong> button below. Shared settings (country, language, review count, threshold) apply to both apps.</p>
+                    <p class="validation-hint" id="competitor_hint">Enter the competitor's Google Play ID or Apple Store name to compare.</p>
                 </details>
 
                 <details class="competitor-section full-width">
@@ -490,6 +508,7 @@
                         <label for="countries">Country Codes (comma-separated, max 6)</label>
                         <input type="text" id="countries" name="countries" placeholder="e.g. us, gb, de, fr, tr, jp">
                         <p class="info-text">Uses the main app (above) across each market. Then click <strong>Compare Countries</strong>.</p>
+                        <p class="validation-hint" id="countries_hint">Enter at least one country code (e.g. us, gb).</p>
                     </div>
                 </details>
 
@@ -497,10 +516,10 @@
                     <button type="submit" class="submit-btn">
                         <span>Fetch &amp; Analyze Reviews</span>
                     </button>
-                    <button type="submit" class="submit-btn compare-btn" formaction="{{ url_for('main.compare_apps') }}">
+                    <button type="submit" id="compareBtn" class="submit-btn compare-btn" formaction="{{ url_for('main.compare_apps') }}">
                         <span>⚔️ Compare Two Apps</span>
                     </button>
-                    <button type="submit" class="submit-btn country-btn" formaction="{{ url_for('main.compare_countries') }}">
+                    <button type="submit" id="countryBtn" class="submit-btn country-btn" formaction="{{ url_for('main.compare_countries') }}">
                         <span>🌍 Compare Countries</span>
                     </button>
                 </div>
@@ -542,6 +561,53 @@
         function showLoading() {
             document.getElementById('loadingOverlay').style.display = 'flex';
         }
+
+        // Guard the comparison buttons: a competitor comparison needs a second
+        // app, and a country comparison needs at least one country. Without this
+        // an empty submit reaches the result page as an "Unknown App" error;
+        // catching it here opens the right section and focuses the missing field.
+        function guardCompare(section, hintId, fields) {
+            const filled = fields.some(id => document.getElementById(id).value.trim());
+            const hint = document.getElementById(hintId);
+            const inputs = fields.map(id => document.getElementById(id));
+            if (filled) {
+                hint.classList.remove('show');
+                inputs.forEach(i => i.classList.remove('field-error'));
+                return true;
+            }
+            section.open = true;                        // reveal the collapsed section
+            hint.classList.add('show');
+            inputs.forEach(i => i.classList.add('field-error'));
+            inputs[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            inputs[0].focus({ preventScroll: true });
+            return false;
+        }
+
+        document.getElementById('compareBtn').addEventListener('click', e => {
+            const section = document.getElementById('compareBtn')
+                .closest('form').querySelector('.competitor-section');
+            if (!guardCompare(section, 'competitor_hint', ['google_id_b', 'apple_name_b'])) {
+                e.preventDefault();
+            } else {
+                showLoading();
+            }
+        });
+
+        document.getElementById('countryBtn').addEventListener('click', e => {
+            const section = document.getElementById('countries').closest('.competitor-section');
+            if (!guardCompare(section, 'countries_hint', ['countries'])) {
+                e.preventDefault();
+            } else {
+                showLoading();
+            }
+        });
+
+        // Clear the error state as soon as the user starts typing
+        ['google_id_b', 'apple_name_b', 'countries'].forEach(id => {
+            document.getElementById(id).addEventListener('input', function () {
+                this.classList.remove('field-error');
+            });
+        });
 
         // Let users paste a full store URL: extract the id/slug on the spot.
         // The server does the same, so this is only immediate feedback.

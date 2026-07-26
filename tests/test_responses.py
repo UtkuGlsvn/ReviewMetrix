@@ -352,3 +352,23 @@ def test_compare_page_renders_listing_strength(client, monkeypatch, reviews_df):
     })
     assert resp.status_code == 200
     assert 'ASO Listing Strength' in resp.data.decode()
+
+
+def test_compare_error_shows_recovery_link(client, monkeypatch, reviews_df, summary_stats):
+    """When one app returns nothing, the compare page offers a way back."""
+    def fetch(google_id, apple_name, country, lang, max_reviews):
+        if google_id == 'com.mock.b':
+            return __import__('pandas').DataFrame(), {'google': None, 'ios': None}
+        return reviews_df.copy(), summary_stats
+
+    monkeypatch.setattr(analyzer, 'fetch_reviews_store', fetch)
+
+    resp = client.post('/compare', data={
+        'google_id': 'com.mock.app', 'apple_name': 'mockapp',
+        'google_id_b': 'com.mock.b', 'apple_name_b': 'mockb',
+        'country': 'us', 'language': 'en', 'max_reviews': '50',
+        'complaint_threshold': '2', 'top_words': '10',
+    })
+    body = resp.data.decode()
+    assert 'No reviews could be found' in body
+    assert 'start a new comparison' in body

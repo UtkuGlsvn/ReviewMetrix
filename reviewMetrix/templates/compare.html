@@ -489,6 +489,10 @@
         <div class="metrics-card" style="border-color: rgba(245,158,11,0.3);">
             {% if app_a.error %}<div class="app-warn"><strong>{{ app_a.name }}:</strong> {{ app_a.error }}</div>{% endif %}
             {% if app_b.error %}<div class="app-warn"><strong>{{ app_b.name }}:</strong> {{ app_b.error }}</div>{% endif %}
+            <p style="margin: 14px 0 0 0; font-size: 0.9rem; color: var(--text-secondary);">
+                Check the app ID or Store name and
+                <a href="{{ url_for('main.index') }}" style="color: var(--accent-a); font-weight: 600;">start a new comparison</a>.
+            </p>
         </div>
         {% endif %}
 
