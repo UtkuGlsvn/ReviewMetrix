@@ -22,6 +22,34 @@ from textblob import TextBlob
 from google_play_scraper import reviews, Sort, app as google_app_details
 from app_store_scraper import AppStore
 
+def parse_google_id(value):
+    """Accept either a package id or a full Play Store URL, return the package id.
+
+    A pasted listing URL like
+    https://play.google.com/store/apps/details?id=com.spotify.music&hl=en
+    yields com.spotify.music; a bare id is returned unchanged.
+    """
+    value = (value or '').strip()
+    match = re.search(r'[?&]id=([^&#]+)', value)
+    if match:
+        return urllib.parse.unquote(match.group(1)).strip()
+    return value
+
+
+def parse_apple_name(value):
+    """Accept either an app-name slug or a full App Store URL, return the slug.
+
+    https://apps.apple.com/us/app/spotify-music-and-podcasts/id324684580 yields
+    spotify-music-and-podcasts (the slug the scraper needs, not the numeric id);
+    a bare slug is returned unchanged.
+    """
+    value = (value or '').strip()
+    match = re.search(r'/app/([^/]+)/id\d+', value)
+    if match:
+        return match.group(1).strip()
+    return value
+
+
 def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fetch):
     all_dfs = []
     summary_stats = {'google': None, 'ios': None}

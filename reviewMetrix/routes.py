@@ -69,8 +69,8 @@ def analyze_reviews():
     try:
         params = _parse_common_params()
         report = analyzer.build_app_report(
-            request.form['google_id'],
-            request.form['apple_name'],
+            analyzer.parse_google_id(request.form.get('google_id', '')),
+            analyzer.parse_apple_name(request.form.get('apple_name', '')),
             params['country'], params['language'], params['max_reviews'],
             params['complaint_threshold'], params['top_words'],
             params['extra_stopwords_str'],
@@ -118,14 +118,16 @@ def compare_apps():
         params = _parse_common_params()
 
         app_a = analyzer.build_app_report(
-            request.form.get('google_id', ''), request.form.get('apple_name', ''),
+            analyzer.parse_google_id(request.form.get('google_id', '')),
+            analyzer.parse_apple_name(request.form.get('apple_name', '')),
             params['country'], params['language'], params['max_reviews'],
             params['complaint_threshold'], params['top_words'],
             params['extra_stopwords_str'],
             params['start_date'], params['end_date'], params['force_refresh'],
         )
         app_b = analyzer.build_app_report(
-            request.form.get('google_id_b', ''), request.form.get('apple_name_b', ''),
+            analyzer.parse_google_id(request.form.get('google_id_b', '')),
+            analyzer.parse_apple_name(request.form.get('apple_name_b', '')),
             params['country'], params['language'], params['max_reviews'],
             params['complaint_threshold'], params['top_words'],
             params['extra_stopwords_str'],
@@ -163,8 +165,8 @@ def compare_countries():
     """Analyse the same app across several markets."""
     try:
         params = _parse_common_params()
-        google_id = request.form.get('google_id', '')
-        apple_name = request.form.get('apple_name', '')
+        google_id = analyzer.parse_google_id(request.form.get('google_id', ''))
+        apple_name = analyzer.parse_apple_name(request.form.get('apple_name', ''))
 
         countries_raw = request.form.get('countries', '')
         # Parse country codes, drop duplicates, cap at six

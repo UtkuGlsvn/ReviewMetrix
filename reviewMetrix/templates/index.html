@@ -417,12 +417,12 @@
                 <div class="form-group">
                     <label for="google_id">Google Play App ID</label>
                     <input type="text" id="google_id" name="google_id" value="com.instagram.android" placeholder="e.g. com.instagram.android" required>
-                    <p class="info-text">Find in Play Store URL (id=...)</p>
+                    <p class="info-text">Package id, or paste the full Play Store URL</p>
                 </div>
                 <div class="form-group">
                     <label for="apple_name">Apple Store App Name</label>
                     <input type="text" id="apple_name" name="apple_name" value="instagram" placeholder="e.g. instagram" required>
-                    <p class="info-text">Name from App Store URL</p>
+                    <p class="info-text">App name slug, or paste the full App Store URL</p>
                 </div>
                 <div class="form-group">
                     <label for="country">Store Country</label>
@@ -542,6 +542,27 @@
         function showLoading() {
             document.getElementById('loadingOverlay').style.display = 'flex';
         }
+
+        // Let users paste a full store URL: extract the id/slug on the spot.
+        // The server does the same, so this is only immediate feedback.
+        function parseGoogleId(v) {
+            const m = (v || '').match(/[?&]id=([^&#]+)/);
+            return m ? decodeURIComponent(m[1]).trim() : v;
+        }
+        function parseAppleName(v) {
+            const m = (v || '').match(/\/app\/([^/]+)\/id\d+/);
+            return m ? m[1].trim() : v;
+        }
+        function cleanOnInput(id, fn) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            // Clean on paste and on leaving the field, not on every keystroke
+            const clean = () => { const c = fn(el.value); if (c !== el.value) el.value = c; };
+            el.addEventListener('blur', clean);
+            el.addEventListener('paste', () => setTimeout(clean, 0));
+        }
+        ['google_id', 'google_id_b'].forEach(id => cleanOnInput(id, parseGoogleId));
+        ['apple_name', 'apple_name_b'].forEach(id => cleanOnInput(id, parseAppleName));
     </script>
 </body>
 </html>
