@@ -70,12 +70,25 @@ For unsupported languages the app does **not** display a misleading neutral
 0.00. Sentiment sections are hidden and an explicit notice is shown; ratings,
 themes, keywords and trends remain available.
 
+### Content prompts (`/prompts`)
+
+A library of copy-ready content prompts for **search, app store and AI**
+optimization, shown in SEO / ASO / AIO tabs. AIO covers AI Optimization /
+Generative Engine Optimization — making content answer-first, citable and
+structured for AI answer engines like AI Overviews, ChatGPT and Perplexity.
+
+Each prompt is an English template with `{placeholder}` fields and a Copy
+button. Prompts live as Markdown files under `reviewMetrix/prompts/{seo,aso,aio}/`;
+adding one is just dropping in a new `.md` file with a `title`/`description`
+front-matter block — no code change needed.
+
 ### Performance and export
 
 - **TTL cache** — scraping results are cached in memory for one hour, keyed by app, country, language and review count (32-entry LRU). Measured on live data: a single app goes 2.42s → 0.22s, a 3-country comparison 6.25s → 0.53s. Empty results are never cached, so a transient scraper failure is not pinned. A **Force refresh** checkbox bypasses the cache.
 - **CSV export** of the filtered complaints, including likes.
 - **PDF export** — scoped to the open tab, via a print stylesheet (white background, chrome hidden, page-break handling) plus a header carrying the section name, app title and review counts. Charts render lazily per tab, so a tab must be opened before it can be printed.
 - **Quick presets** for nine popular apps, plus an optional date-range filter.
+- **Store URLs accepted** — paste a full Play Store or App Store URL into the id / name fields and it is parsed to the id/slug, server-side and on the fly.
 
 ---
 
