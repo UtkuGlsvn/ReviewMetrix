@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Prompts - ReviewMetrix</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(22, 28, 45, 0.4);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --accent-primary: #8b5cf6;
+            --accent-secondary: #ec4899;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --font-family: 'Plus Jakarta Sans', sans-serif;
+            --green: #10b981;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            background-image:
+                radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(236, 72, 153, 0.1) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            margin: 0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 20px;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .logo {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #a78bfa 0%, #ec4899 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            padding: 10px 18px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--accent-primary);
+        }
+
+        .intro {
+            color: var(--text-secondary);
+            font-size: 1.05rem;
+            margin: 0 0 28px 0;
+            max-width: 680px;
+            line-height: 1.6;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+
+        .tab-btn {
+            font-family: var(--font-family);
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 12px 22px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .tab-btn small {
+            font-weight: 400;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .tab-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+        }
+
+        .tab-btn.is-active {
+            color: var(--text-primary);
+            background: rgba(139, 92, 246, 0.14);
+            border-color: rgba(139, 92, 246, 0.4);
+        }
+
+        .tab-count {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 20px;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.is-active {
+            display: grid;
+            gap: 20px;
+        }
+
+        .prompt-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 18px;
+            padding: 24px;
+        }
+
+        .prompt-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 6px;
+        }
+
+        .prompt-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .prompt-desc {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin: 0 0 16px 0;
+        }
+
+        .copy-btn {
+            flex: 0 0 auto;
+            font-family: var(--font-family);
+            background: rgba(139, 92, 246, 0.1);
+            color: var(--accent-primary);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 10px;
+            padding: 8px 14px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .copy-btn:hover {
+            background: rgba(139, 92, 246, 0.2);
+            color: var(--text-primary);
+        }
+
+        .copy-btn.copied {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--green);
+            border-color: rgba(16, 185, 129, 0.4);
+        }
+
+        .prompt-body {
+            margin: 0;
+            background: rgba(0, 0, 0, 0.28);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 16px 18px;
+            font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+            font-size: 0.82rem;
+            line-height: 1.6;
+            color: #cbd5e1;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .prompt-body::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .prompt-body::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        .placeholder-note {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            margin: 12px 0 0 0;
+        }
+
+        .placeholder-note code {
+            background: rgba(139, 92, 246, 0.12);
+            color: #a78bfa;
+            padding: 1px 6px;
+            border-radius: 5px;
+            font-size: 0.78rem;
+        }
+
+        .empty {
+            color: var(--text-secondary);
+            padding: 30px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="topbar">
+            <div class="logo">ReviewMetrix</div>
+            <a href="{{ url_for('main.index') }}" class="back-btn">← Back to Analysis</a>
+        </div>
+
+        <p class="intro">
+            Copy-ready content prompts for <strong>search, app store and AI</strong> optimization.
+            Each is written to be pasted into an AI assistant — fill in the
+            <code style="background: rgba(139,92,246,0.12); color: #a78bfa; padding: 1px 5px; border-radius: 4px;">{placeholders}</code>
+            with your own details first.
+        </p>
+
+        <div class="tabs" role="tablist">
+            {% for slug, data in library.items() %}
+            <button type="button" class="tab-btn {{ 'is-active' if loop.first }}" role="tab"
+                data-tab="{{ slug }}" aria-selected="{{ 'true' if loop.first else 'false' }}">
+                {{ data.label }}
+                <small>{{ data.subtitle }}</small>
+                <span class="tab-count">{{ data['items']|length }}</span>
+            </button>
+            {% endfor %}
+        </div>
+
+        {% for slug, data in library.items() %}
+        <section class="tab-panel {{ 'is-active' if loop.first }}" id="panel-{{ slug }}" data-panel="{{ slug }}">
+            {% for item in data['items'] %}
+            <div class="prompt-card">
+                <div class="prompt-head">
+                    <div>
+                        <h3 class="prompt-title">{{ item.title }}</h3>
+                    </div>
+                    <button type="button" class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+                </div>
+                {% if item.description %}<p class="prompt-desc">{{ item.description }}</p>{% endif %}
+                <pre class="prompt-body">{{ item.body }}</pre>
+            </div>
+            {% else %}
+            <p class="empty">No prompts in this category yet.</p>
+            {% endfor %}
+        </section>
+        {% endfor %}
+    </div>
+
+    <script>
+        // Tabs
+        const tabButtons = [...document.querySelectorAll('.tab-btn')];
+        const tabPanels = [...document.querySelectorAll('.tab-panel')];
+        tabButtons.forEach(btn => btn.addEventListener('click', () => {
+            const name = btn.dataset.tab;
+            tabButtons.forEach(b => {
+                const on = b === btn;
+                b.classList.toggle('is-active', on);
+                b.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            tabPanels.forEach(p => p.classList.toggle('is-active', p.dataset.panel === name));
+        }));
+
+        // Copy the prompt body to the clipboard, with a fallback for
+        // non-secure contexts where the Clipboard API is unavailable.
+        function copyPrompt(button) {
+            const text = button.closest('.prompt-card').querySelector('.prompt-body').textContent;
+            const done = () => {
+                const original = button.textContent;
+                button.textContent = 'Copied!';
+                button.classList.add('copied');
+                setTimeout(() => { button.textContent = original; button.classList.remove('copied'); }, 1600);
+            };
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+            } else {
+                fallbackCopy(text, done);
+            }
+        }
+
+        function fallbackCopy(text, done) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); done(); } catch (e) { /* give up quietly */ }
+            document.body.removeChild(ta);
+        }
+    </script>
+</body>
+
+</html>

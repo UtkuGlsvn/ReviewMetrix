@@ -30,6 +30,13 @@ def index():
     return render_template('index.html')
 
 
+@main_bp.route('/prompts')
+def prompts():
+    """Copy-ready SEO / ASO / AIO content prompts, loaded from the prompts/ folder."""
+    from .prompt_library import load_prompts
+    return render_template('prompts.html', library=load_prompts())
+
+
 # Hard ceilings enforced server-side. The form has matching min/max attributes,
 # but those only guide the browser; a crafted POST can send anything. An
 # unbounded max_reviews is the dangerous one: it costs a single rate-limit unit
