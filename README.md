@@ -1,9 +1,11 @@
 # ReviewMetrix — App Review Intelligence
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-8b5cf6.svg)](LICENSE)
+&nbsp;·&nbsp; [User guide](HELP.md)
+
 <p align="center">
-  <img src="https://raw.githubusercontent.com/UtkuGlsvn/ReviewMetrix/main/img/ReviewMetrix.png" width="350" alt="ReviewMetrix Main Page">
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="https://raw.githubusercontent.com/UtkuGlsvn/ReviewMetrix/main/img/ReviewMetrixAnalys.png" width="350" alt="ReviewMetrix Analysis Page">
+  <img src="https://raw.githubusercontent.com/UtkuGlsvn/ReviewMetrix/main/img/ReviewMetrix.png" width="420" alt="ReviewMetrix input form">
+  <img src="https://raw.githubusercontent.com/UtkuGlsvn/ReviewMetrix/main/img/ReviewMetrixAnalys.png" width="420" alt="ReviewMetrix analysis dashboard">
 </p>
 
 ReviewMetrix is a Flask web app that scrapes user reviews for any app from the
@@ -11,6 +13,8 @@ Google Play Store and the Apple App Store, then turns them into an
 app-intelligence dashboard: complaint themes, rating distribution, trends,
 version regressions, competitor and multi-market comparison, and ASO keyword
 gaps.
+
+New here? The **[user guide](HELP.md)** walks through every field, tab and metric.
 
 ---
 
@@ -38,6 +42,10 @@ tab only.
 Review likes (`thumbsUpCount`) are treated as additional affected users: they
 feed the priority score and sort the review table, so the complaint the most
 people endorsed appears first.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/UtkuGlsvn/ReviewMetrix/main/img/ReviewMetrixIssues.png" width="720" alt="Issues tab: complaint themes and Fix First prioritization">
+</p>
 
 ### Comparison
 
@@ -81,6 +89,10 @@ Each prompt is an English template with `{placeholder}` fields and a Copy
 button. Prompts live as Markdown files under `reviewMetrix/prompts/{seo,aso,aio}/`;
 adding one is just dropping in a new `.md` file with a `title`/`description`
 front-matter block — no code change needed.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/UtkuGlsvn/ReviewMetrix/main/img/ReviewMetrixPrompts.png" width="720" alt="Content prompts page with SEO / ASO / AIO tabs">
+</p>
 
 ### Performance and export
 
@@ -300,3 +312,19 @@ so sort direction is actually asserted, rather than passing vacuously.
 - **Sentiment outside English is lexicon-based.** It handles clearly polar wording and negation, but factual complaints with no polar words score 0.00. It is not a transformer model, and accuracy expectations should be set accordingly.
 - **The cache is per-process.** Running multiple workers gives each its own cache; a shared store (e.g. Redis) would be needed for a real deployment.
 - **The dev server is not production-ready.** Use a WSGI server such as gunicorn behind a reverse proxy.
+
+---
+
+## Documentation
+
+- **[User guide (HELP.md)](HELP.md)** — every field, tab and metric, plus troubleshooting.
+
+## Contributing
+
+Content prompts are just Markdown files under `reviewMetrix/prompts/{seo,aso,aio}/` —
+adding one needs no code. For code changes, please keep the test suite green
+(`pytest`) and add tests for new behaviour.
+
+## License
+
+Released under the [MIT License](LICENSE). © 2026 Utku Gülseven.
