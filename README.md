@@ -98,14 +98,20 @@ front-matter block — no code change needed.
 ReviewMetrix/
 ├── reviewMetrix/
 │   ├── __init__.py                  # Application factory, NLTK bootstrap
-│   ├── routes.py                    # /, /analyze, /compare, /compare-countries
+│   ├── routes.py                    # /, /analyze, /compare, /compare-countries, /prompts
 │   ├── analyzer.py                  # Scraping, caching, analysis, ASO
 │   ├── ratelimit.py                 # Per-IP scrape budget
+│   ├── prompt_library.py            # Loads the SEO/ASO/AIO prompts
+│   ├── prompts/                     # Prompt Markdown files, by category
+│   │   ├── seo/
+│   │   ├── aso/
+│   │   └── aio/
 │   └── templates/
 │       ├── index.html               # Input form
 │       ├── results.html             # Single-app dashboard
 │       ├── compare.html             # Two-app comparison
-│       └── compare_countries.html   # Multi-market comparison
+│       ├── compare_countries.html   # Multi-market comparison
+│       └── prompts.html             # SEO / ASO / AIO prompt library
 ├── tests/                           # pytest suite (offline)
 ├── run.py                           # Entry point
 ├── requirements.txt
@@ -257,7 +263,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-222 tests covering:
+253 tests covering:
 
 - `tests/test_analyzer.py` — rating distribution, theme categorization, platform comparison, date-range filtering, trending keywords, version breakdown, sentiment, preprocessing, and the `build_app_report` pipeline including every error branch.
 - `tests/test_routes.py` — all four routes, error paths, the date-filter badge, country de-duplication and the 6-country cap, and partial failures where one app or market returns no data.
@@ -267,6 +273,7 @@ pytest
 - `tests/test_priorities.py` — momentum thresholds and per-platform scoping, priority ranking against raw volume, likes as affected users, and review ordering.
 - `tests/test_responses.py` — reply rates, median reply time, per-theme gaps, competitor keyword gap, and the POS context fix.
 - `tests/test_ratelimit.py` — window mechanics, per-unit costs, rejected requests not being recorded, IP isolation, stale-key eviction and the X-Forwarded-For trust boundary.
+- `tests/test_prompts.py` — prompt front-matter parsing (placeholders preserved), loaded counts matching the files on disk, ordering, caching, and the page rendering its tabs and copy handler.
 
 Test data is deliberately discriminating — ordering fixtures use unequal counts
 so sort direction is actually asserted, rather than passing vacuously.

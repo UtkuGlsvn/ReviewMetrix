@@ -71,6 +71,44 @@
             margin: 0 auto;
         }
 
+        /* Prompt library call-to-action under the tagline */
+        .prompts-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 22px;
+            padding: 11px 22px;
+            border-radius: 999px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.18), rgba(236, 72, 153, 0.18));
+            border: 1px solid transparent;
+            background-origin: border-box;
+            box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.35) inset;
+            transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+        }
+
+        .prompts-cta:hover {
+            transform: translateY(-2px);
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(236, 72, 153, 0.3));
+            box-shadow: 0 8px 22px rgba(139, 92, 246, 0.25), 0 0 0 1px rgba(139, 92, 246, 0.5) inset;
+        }
+
+        .prompts-cta-icon {
+            font-size: 1.05rem;
+        }
+
+        .prompts-cta-arrow {
+            color: var(--accent-primary);
+            transition: transform 0.2s;
+        }
+
+        .prompts-cta:hover .prompts-cta-arrow {
+            transform: translateX(4px);
+        }
+
         .card {
             background: var(--card-bg);
             backdrop-filter: blur(16px);
@@ -410,6 +448,11 @@
         <div class="header-section">
             <div class="logo">ReviewMetrix</div>
             <div class="tagline">Dual-platform app review scraper, sentiment analyzer, and topic intelligence dashboard.</div>
+            <a href="{{ url_for('main.prompts') }}" class="prompts-cta">
+                <span class="prompts-cta-icon">📝</span>
+                <span>SEO / ASO / AIO content prompts</span>
+                <span class="prompts-cta-arrow">→</span>
+            </a>
         </div>
 
         <div class="card">
