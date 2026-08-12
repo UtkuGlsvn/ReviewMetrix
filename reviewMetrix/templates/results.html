@@ -226,7 +226,7 @@
             left: 50%;
             transform: translateX(-50%);
             width: max-content;
-            max-width: 270px;
+            max-width: min(270px, 78vw);
             background: #0b0f19;
             border: 1px solid var(--card-border);
             color: var(--text-primary);
@@ -238,9 +238,10 @@
             text-align: left;
             letter-spacing: normal;
             text-transform: none;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.15s;
+            /* display:none, not visibility:hidden — a hidden but laid-out bubble
+               still extends the document width and caused a phantom horizontal
+               scroll on mobile (measured: 453px vs a 375px viewport). */
+            display: none;
             z-index: 200;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
             pointer-events: none;
@@ -251,8 +252,7 @@
         .tip:hover::after,
         .tip:focus-visible::after,
         .tip.is-open::after {
-            opacity: 1;
-            visibility: visible;
+            display: block;
         }
 
         /* Near the right edge the centred bubble would overflow; a right-anchored
