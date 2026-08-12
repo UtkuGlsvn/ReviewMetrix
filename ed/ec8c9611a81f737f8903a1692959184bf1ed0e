@@ -1,0 +1,19 @@
+reviewMetrix/templates/results.html
+  s_3d115d87534479::t_76b02847bff737 229,241-244,255
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "edec8c9611a81f737f8903a1692959184bf1ed0e",
+  "prompts": {},
+  "sessions": {
+    "s_3d115d87534479": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9146c4df-38d3-4f22-ac59-cde09be4170c",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "utku glsvn <utku.glsvn@gmail.com>"
+    }
+  }
+}
