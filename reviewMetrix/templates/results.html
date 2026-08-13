@@ -691,6 +691,131 @@
             line-height: 1.5;
         }
 
+        .mo-info {
+            display: inline-block;
+            margin-top: 8px;
+            font-family: var(--font-family);
+            background: rgba(139, 92, 246, 0.1);
+            color: var(--accent-primary);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 8px;
+            padding: 5px 11px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .mo-info:hover {
+            background: rgba(139, 92, 246, 0.2);
+            color: var(--text-primary);
+        }
+
+        /* Distribution modal */
+        .mo-modal-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .mo-modal-backdrop.open {
+            display: flex;
+        }
+
+        .mo-modal {
+            background: #0f1523;
+            border: 1px solid var(--card-border);
+            border-radius: 18px;
+            padding: 26px;
+            max-width: 460px;
+            width: 100%;
+            position: relative;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .mo-modal h4 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.25rem;
+            margin: 0 0 4px 0;
+        }
+
+        .mo-modal-sub {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin: 0 0 20px 0;
+        }
+
+        .mo-modal-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            color: var(--text-secondary);
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .mo-modal-close:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .mo-dist-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 9px;
+        }
+
+        .mo-dist-star {
+            flex: 0 0 34px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-align: right;
+        }
+
+        .mo-dist-track {
+            flex: 1;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .mo-dist-fill {
+            display: block;   /* a span is inline by default, which ignores width */
+            height: 100%;
+            min-width: 2px;   /* keep a sliver visible even at very low percentages */
+            border-radius: 5px;
+            transition: width 0.4s;
+        }
+
+        .mo-dist-count {
+            flex: 0 0 74px;
+            font-size: 0.8rem;
+            color: var(--text-primary);
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .mo-modal-text {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            line-height: 1.6;
+            margin: 20px 0 0 0;
+            padding-top: 16px;
+            border-top: 1px solid var(--card-border);
+        }
+
         .mo-note strong {
             color: var(--text-primary);
         }
@@ -1461,9 +1586,30 @@
                         {% else %}
                         Recent reviews are in line with the lifetime average.
                         {% endif %}
+                        <button type="button" class="mo-info" data-platform="{{ m.platform }}"
+                            data-recent="{{ "%.2f"|format(m.recent) }}" data-sample="{{ m.sample }}">
+                            ⓘ Why this number?
+                        </button>
                     </p>
                 </div>
                 {% endfor %}
+            </div>
+        </div>
+
+        <!-- Momentum distribution modal -->
+        <div class="mo-modal-backdrop" id="moModal" role="dialog" aria-modal="true" aria-labelledby="moModalTitle">
+            <div class="mo-modal">
+                <button type="button" class="mo-modal-close" aria-label="Close">✕</button>
+                <h4 id="moModalTitle">Rating distribution</h4>
+                <p class="mo-modal-sub" id="moModalSub"></p>
+                <div class="mo-dist" id="moDist"></div>
+                <p class="mo-modal-text">
+                    The recent average is a single number over the reviews scraped for your
+                    selected <strong>country and language</strong>. It can hide a split — many 5★
+                    <em>and</em> many 1★ average out to a middling score. Read the shape above,
+                    not just the mean. Analyzing in the language your users actually write in
+                    gives the truest picture.
+                </p>
             </div>
         </div>
         {% endif %}
@@ -2201,6 +2347,46 @@
 
         document.addEventListener('click', () => closeAllTips(null));
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAllTips(null); });
+
+        // ---- Rating Momentum: "Why this number?" distribution popup ----
+        const moDistData = ({{ rating_distribution | tojson | safe }} || { by_platform: {}, overall: {} });
+        const moModal = document.getElementById('moModal');
+
+        function openMoModal(button) {
+            if (!moModal) return;
+            const platform = button.dataset.platform;
+            const recent = button.dataset.recent;
+            const sample = button.dataset.sample;
+            const dist = (moDistData.by_platform && moDistData.by_platform[platform]) || moDistData.overall || {};
+
+            document.getElementById('moModalTitle').textContent = platform + ' — how the recent ' + sample + ' reviews split';
+            document.getElementById('moModalSub').textContent = 'They average ' + recent + '★. Here is the shape behind that average:';
+
+            const total = ['1', '2', '3', '4', '5'].reduce((s, k) => s + (dist[k] || 0), 0) || 1;
+            const colors = { '1': '#ef4444', '2': '#f59e0b', '3': '#eab308', '4': '#84cc16', '5': '#10b981' };
+            const rows = ['5', '4', '3', '2', '1'].map(star => {
+                const count = dist[star] || 0;
+                const pct = Math.round(count * 100 / total);
+                return `<div class="mo-dist-row">
+                    <span class="mo-dist-star">${star}★</span>
+                    <span class="mo-dist-track"><span class="mo-dist-fill" style="width:${pct}%;background:${colors[star]}"></span></span>
+                    <span class="mo-dist-count">${count} · ${pct}%</span>
+                </div>`;
+            }).join('');
+            document.getElementById('moDist').innerHTML = rows;
+
+            moModal.classList.add('open');
+        }
+
+        function closeMoModal() { if (moModal) moModal.classList.remove('open'); }
+
+        document.querySelectorAll('.mo-info').forEach(btn =>
+            btn.addEventListener('click', () => openMoModal(btn)));
+        if (moModal) {
+            moModal.querySelector('.mo-modal-close').addEventListener('click', closeMoModal);
+            moModal.addEventListener('click', e => { if (e.target === moModal) closeMoModal(); });
+            document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMoModal(); });
+        }
     </script>
     {% endif %}
 </body>
