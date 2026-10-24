@@ -1,7 +1,11 @@
 # ReviewMetrix — App Review Intelligence
 
+## Demo: https://appreviewmetrix.onrender.com
+
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-8b5cf6.svg)](LICENSE)
 &nbsp;·&nbsp; [User guide](HELP.md)
+
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/UtkuGlsvn/ReviewMetrix/main/img/ReviewMetrix.png" width="420" alt="ReviewMetrix input form">
