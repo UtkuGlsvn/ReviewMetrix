@@ -1,0 +1,23 @@
+Dockerfile
+  s_cf9e618a92482a::t_96c79966f75bc4 17-20
+requirements.txt
+  s_cf9e618a92482a::t_96c79966f75bc4 8-9
+README.md
+  s_cf9e618a92482a::t_96c79966f75bc4 160
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "441a739f63396219c3612c8b198866300dcb6833",
+  "prompts": {},
+  "sessions": {
+    "s_cf9e618a92482a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "08d527b7-1688-4383-85af-8fca05d32ad7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "utku glsvn <utku.glsvn@gmail.com>"
+    }
+  }
+}
