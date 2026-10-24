@@ -2259,7 +2259,13 @@
         const sampleReviews = {{ sample_reviews | tojson | safe }};
         function exportReviewsCSV() {
             const header = ['platform', 'likes', 'score', 'sentiment', 'review'];
-            const escape = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+            // Text starting with = + - @ (or tab/CR) runs as a formula in Excel, so
+            // neutralise it with a leading quote. Numbers (e.g. negative sentiment) are left alone.
+            const escape = (v) => {
+                let s = String(v == null ? '' : v);
+                if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
+                return '"' + s.replace(/"/g, '""') + '"';
+            };
             const rows = sampleReviews.map(r => [r.platform || '', r.likes ?? 0, r.score, r.sentiment, r.review].map(escape).join(','));
             const csv = [header.join(','), ...rows].join('\n');
             const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });

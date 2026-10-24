@@ -1,8 +1,14 @@
+import logging
+
 from flask import Blueprint, request, render_template
 from . import analyzer
 from .ratelimit import limiter, client_ip
 
 main_bp = Blueprint('main', __name__)
+logger = logging.getLogger(__name__)
+
+# Shown instead of the exception text, which can leak internals
+GENERIC_ERROR = "An unexpected error occurred. Please try again later."
 
 
 def _check_rate_limit(template, cost):
@@ -108,10 +114,10 @@ def analyze_reviews():
             momentum=report['momentum'],
             responses=report['responses'],
         )
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    except Exception:
+        logger.exception("%s failed", request.path)
         return render_template('results.html',
-                               error=f"An unexpected error occurred: {e}",
+                               error=GENERIC_ERROR,
                                summary_stats=None)
 
 
@@ -150,10 +156,10 @@ def compare_apps():
         return render_template('compare.html', app_a=app_a, app_b=app_b,
                                keyword_gap=keyword_gap,
                                listing_a=listing_a, listing_b=listing_b)
-    except Exception as e:
-        print(f"A compare error occurred: {e}")
+    except Exception:
+        logger.exception("%s failed", request.path)
         return render_template('compare.html',
-                               error=f"An unexpected error occurred: {e}")
+                               error=GENERIC_ERROR)
 
 
 def _avg_store_rating(summary_stats):
@@ -221,7 +227,7 @@ def compare_countries():
         return render_template('compare_countries.html',
                                reports=reports, chart_data=chart_data,
                                app_label=(apple_name or google_id or 'App'))
-    except Exception as e:
-        print(f"A country-compare error occurred: {e}")
+    except Exception:
+        logger.exception("%s failed", request.path)
         return render_template('compare_countries.html',
-                               error=f"An unexpected error occurred: {e}")
+                               error=GENERIC_ERROR)
