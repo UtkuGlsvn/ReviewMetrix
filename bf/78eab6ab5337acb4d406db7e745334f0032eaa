@@ -1,0 +1,19 @@
+tests/test_security.py
+  s_52ea718cd8ac34::t_7b8cc4529794b8 1-152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bf78eab6ab5337acb4d406db7e745334f0032eaa",
+  "prompts": {},
+  "sessions": {
+    "s_52ea718cd8ac34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "107701b4-00f8-4b63-8f8c-1e20f01c9af1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "utku glsvn <utku.glsvn@gmail.com>"
+    }
+  }
+}
