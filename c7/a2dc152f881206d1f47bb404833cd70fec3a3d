@@ -1,0 +1,34 @@
+tests/test_priorities.py
+  s_5b828a213e979c::t_c9f0691dbc41d5 251
+  s_5b828a213e979c::t_f4dae4ec4b217a 254-295
+README.md
+  s_5b828a213e979c::t_3fc5d6f0f2304b 33,183
+reviewMetrix/analyzer.py
+  s_5b828a213e979c::t_4d51c981833684 631-649
+  s_5b828a213e979c::t_09a25aaefa3825 664,667
+  s_5b828a213e979c::t_35b7208cd4867f 686
+  s_5b828a213e979c::t_87179653921ccd 699-700
+  s_5b828a213e979c::t_6cc50aadf2bf99 710
+reviewMetrix/routes.py
+  s_5b828a213e979c::t_33b61aa0a5a933 142
+reviewMetrix/templates/results.html
+  s_5b828a213e979c::t_7dbc77c4eacbf8 1702
+  s_5b828a213e979c::t_b4ac0d036115b9 1703
+  s_5b828a213e979c::t_d4a1c5d4b15083 1663
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c7a2dc152f881206d1f47bb404833cd70fec3a3d",
+  "prompts": {},
+  "sessions": {
+    "s_5b828a213e979c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9d010eb0-846a-4b41-8d39-4a18bdb78a4b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "utku glsvn <utku.glsvn@gmail.com>"
+    }
+  }
+}
