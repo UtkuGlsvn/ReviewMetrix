@@ -113,18 +113,10 @@ def test_itunes_request_has_timeout_and_encoded_params(monkeypatch):
         seen.update(url=url, params=params, timeout=timeout)
         return FakeResp()
 
-    class FakeAppStore:
-        def __init__(self, **kwargs):
-            self.reviews = []
-
-        def review(self, how_many):
-            pass
-
     def failing(*args, **kwargs):
         raise RuntimeError('no network in tests')
 
     monkeypatch.setattr(analyzer.requests, 'get', fake_get)
-    monkeypatch.setattr(analyzer, 'AppStore', FakeAppStore)
     monkeypatch.setattr(analyzer, 'reviews', failing)
 
     df, stats = analyzer.fetch_reviews_store('com.x', 'a&b c', 'us', 'en', 10)
@@ -144,9 +136,40 @@ def test_google_store_url_encodes_package_id(monkeypatch):
     monkeypatch.setattr(analyzer, 'google_app_details', lambda *a, **k: {'title': 'X'})
     monkeypatch.setattr(analyzer.requests, 'get',
                         lambda *a, **k: (_ for _ in ()).throw(RuntimeError('offline')))
-    monkeypatch.setattr(analyzer, 'AppStore',
-                        lambda **k: (_ for _ in ()).throw(RuntimeError('offline')))
 
     _, stats = analyzer.fetch_reviews_store('com.x&hl="><b>', '', 'us', 'en', 10)
     assert stats['google']['store_url'] == (
         'https://play.google.com/store/apps/details?id=com.x%26hl%3D%22%3E%3Cb%3E')
+
+
+def test_apple_rss_reviews_parsed_and_capped(monkeypatch):
+    from reviewMetrix import analyzer
+    urls = []
+
+    def entry(i):
+        return {'im:rating': {'label': '2'}, 'im:version': {'label': '1.0'},
+                'updated': {'label': '2026-10-22T22:24:31-07:00'},
+                'content': {'label': f'review {i}'}}
+
+    class FakeResp:
+        status_code = 200
+
+        def __init__(self, url):
+            self.url = url
+
+        def json(self):
+            # page 1 also carries the app-metadata entry (no rating), which is skipped
+            return {'feed': {'entry': [{'im:name': {}}] + [entry(i) for i in range(50)]}}
+
+    def fake_get(url, timeout=None):
+        urls.append(url)
+        return FakeResp(url)
+
+    monkeypatch.setattr(analyzer.requests, 'get', fake_get)
+    df = analyzer.fetch_apple_reviews(324684580, 'us', 60)
+
+    assert len(urls) == 2 and 'id=324684580' in urls[0]
+    assert len(df) == 60
+    assert df['score'].iloc[0] == 2 and df['version'].iloc[0] == '1.0'
+    assert set(df['platform']) == {'App Store'}
+    assert df['date'].dt.tz is None

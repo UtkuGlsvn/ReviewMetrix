@@ -11,8 +11,11 @@ Each prompt is a Markdown file with a small front-matter block:
 Adding a prompt is just dropping a new .md file into the right category folder;
 no code change is needed. Files are read once and cached for the process.
 """
+import logging
 import os
 import re
+
+logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = os.path.join(os.path.dirname(__file__), 'prompts')
 
@@ -69,7 +72,7 @@ def load_prompts(force=False):
                     with open(path, encoding='utf-8') as fh:
                         title, description, body = _parse(fh.read())
                 except OSError as e:
-                    print(f"Could not read prompt {path}: {e}")
+                    logger.warning(f"Could not read prompt {path}: {e}")
                     continue
                 items.append({
                     'id': filename[:-3],

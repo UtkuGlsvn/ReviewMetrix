@@ -37,6 +37,19 @@ def index():
     return render_template('index.html')
 
 
+@main_bp.route('/healthz')
+def healthz():
+    """Cheap liveness probe for the host (Render health check); scrapes nothing."""
+    return {'status': 'ok'}
+
+
+@main_bp.route('/favicon.ico')
+def favicon():
+    """Pages embed an inline SVG icon; answer the browser's default probe
+    with no content instead of a logged 404."""
+    return '', 204
+
+
 @main_bp.route('/prompts')
 def prompts():
     """Copy-ready SEO / ASO / AIO content prompts, loaded from the prompts/ folder."""

@@ -157,7 +157,6 @@ source venv/bin/activate        # Windows: .\venv\Scripts\activate
 
 ```bash
 pip install -r requirements.txt
-pip install --no-deps app-store-scraper==0.3.5  # its requests==2.23 pin breaks on Python 3.12
 ```
 
 NLTK stopwords and the POS tagger are downloaded automatically on first run.
@@ -300,7 +299,7 @@ so sort direction is actually asserted, rather than passing vacuously.
 | Backend | Python, Flask (application factory + blueprints) |
 | Data | pandas, NLTK, TextBlob |
 | Charts | ApexCharts, Matplotlib, WordCloud |
-| Scraping | `google-play-scraper`, `app-store-scraper`, iTunes Search API |
+| Scraping | `google-play-scraper`, iTunes Search API, App Store RSS reviews feed |
 | Testing | pytest |
 | Serving | gunicorn, Docker |
 
@@ -309,7 +308,7 @@ so sort direction is actually asserted, rather than passing vacuously.
 ## Known Limitations
 
 - **Several signals are Google Play only.** The App Store scraper exposes neither the app version per review, nor review likes, nor developer replies — so the version breakdown, likes weighting and response analysis cover Google Play alone, and the UI labels them as such. Ratings, themes, sentiment and keywords use both stores.
-- **App Store scraping is fragile.** `app-store-scraper` breaks when Apple changes its endpoints. Review fetching failures are caught, so the rest of the report still renders.
+- **App Store reviews are capped at 500.** They come from Apple's public RSS feed, which serves the 500 newest reviews per country and no reply or like data. Fetch failures are caught, so the rest of the report still renders.
 - **Sentiment outside English is lexicon-based.** It handles clearly polar wording and negation, but factual complaints with no polar words score 0.00. It is not a transformer model, and accuracy expectations should be set accordingly.
 - **The cache is per-process.** Running multiple workers gives each its own cache; a shared store (e.g. Redis) would be needed for a real deployment.
 - **The dev server is not production-ready.** Use a WSGI server such as gunicorn behind a reverse proxy.

@@ -14,10 +14,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
-    # app-store-scraper pins requests==2.23, whose urllib3 breaks on Python 3.12;
-    # install it without deps so the modern requests above is used
-    && pip install --no-cache-dir --no-deps app-store-scraper==0.3.5
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY reviewMetrix/ ./reviewMetrix/
 COPY run.py .

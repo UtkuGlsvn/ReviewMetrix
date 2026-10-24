@@ -1,4 +1,5 @@
 # reviewMetrix/analyzer.py
+import logging
 import pandas as pd
 from nltk.corpus import stopwords
 import os
@@ -20,7 +21,8 @@ import urllib.parse
 from textblob import TextBlob
 
 from google_play_scraper import reviews, Sort, app as google_app_details
-from app_store_scraper import AppStore
+
+logger = logging.getLogger(__name__)
 
 def parse_google_id(value):
     """Accept either a package id or a full Play Store URL, return the package id.
@@ -111,7 +113,7 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
             'store_url': f'https://play.google.com/store/apps/details?id={urllib.parse.quote(google_id, safe="")}',
         }
     except Exception as e:
-        print(f"Google Play fetch error->: {e}")
+        logger.warning(f"Google Play fetch error->: {e}")
 
     # --- Apple Store: metadata via the iTunes API, reviews via the scraper ---
     try:
@@ -127,6 +129,7 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
         if itunes_resp.status_code == 200 and itunes_resp.json().get('resultCount', 0) > 0:
             app_data = itunes_resp.json()['results'][0]
             summary_stats['ios'] = {
+                'app_id': app_data.get('trackId'),
                 'rating': float(app_data.get('averageUserRating', 0)),
                 'reviews': int(app_data.get('userRatingCount', 0)),
                 'title': app_data.get('trackName', 'Unknown'),
@@ -143,25 +146,70 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
                 'store_url': app_data.get('trackViewUrl') if str(app_data.get('trackViewUrl', '')).startswith('https://') else None,
             }
     except Exception as e:
-        print(f"iTunes API Error ->: {e}")
+        logger.warning(f"iTunes API Error ->: {e}")
 
     try:
-        apple_scraper = AppStore(country=country, app_name=apple_name)
-        apple_scraper.review(how_many=max_reviews_to_fetch)
-        if apple_scraper.reviews:
-            apple_df = pd.DataFrame(apple_scraper.reviews)
-            apple_df_renamed = apple_df[['review', 'rating', 'date']].rename(columns={'rating': 'score'})
-            apple_df_renamed['platform'] = 'App Store'
-            apple_df_renamed['version'] = None  # not exposed by the App Store scraper
-            apple_df_renamed['likes'] = 0       # not exposed by the App Store scraper
-            apple_df_renamed['reply'] = None    # not exposed by the App Store scraper
-            apple_df_renamed['replied_at'] = None
-            all_dfs.append(apple_df_renamed)
-    except Exception as e:  
-        print(f"Apple Store fetch review error ->: {e}")
-    
+        app_id = (summary_stats['ios'] or {}).get('app_id')
+        apple_df = fetch_apple_reviews(app_id, country, max_reviews_to_fetch) if app_id else None
+        if apple_df is not None and not apple_df.empty:
+            all_dfs.append(apple_df)
+    except Exception as e:
+        logger.warning(f"Apple Store fetch review error ->: {e}")
+
     reviews_df = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
     return reviews_df, summary_stats
+
+
+APPLE_RSS_URL = ("https://itunes.apple.com/{country}/rss/customerreviews/"
+                 "page={page}/id={app_id}/sortby=mostrecent/json")
+APPLE_RSS_PAGE_SIZE = 50
+APPLE_RSS_MAX_PAGES = 10  # Apple serves at most 10 pages (500 reviews)
+
+
+def fetch_apple_reviews(app_id, country, max_reviews):
+    """Fetch the newest App Store reviews from Apple's public RSS feed.
+
+    Replaces app-store-scraper, whose id lookup scraped a search page that no
+    longer matches. The feed needs the numeric id (from the iTunes API) and
+    also carries the app version, so iOS reviews join the version breakdown.
+    """
+    rows = []
+    pages = min(APPLE_RSS_MAX_PAGES, -(-max_reviews // APPLE_RSS_PAGE_SIZE))
+    for page in range(1, pages + 1):
+        resp = requests.get(
+            APPLE_RSS_URL.format(country=urllib.parse.quote(country), page=page,
+                                 app_id=int(app_id)),
+            timeout=ITUNES_TIMEOUT_SECONDS,
+        )
+        if resp.status_code != 200:
+            break
+        entries = resp.json().get('feed', {}).get('entry') or []
+        if isinstance(entries, dict):  # a single-review page is not wrapped in a list
+            entries = [entries]
+        # Entries without a rating are the app's own metadata, not reviews
+        entries = [e for e in entries if 'im:rating' in e]
+        if not entries:
+            break
+        for e in entries:
+            rows.append({
+                'review': e.get('content', {}).get('label', ''),
+                'score': int(e['im:rating']['label']),
+                'date': e.get('updated', {}).get('label'),
+                'version': e.get('im:version', {}).get('label'),
+            })
+        if len(rows) >= max_reviews or len(entries) < APPLE_RSS_PAGE_SIZE:
+            break
+
+    if not rows:
+        return None
+    df = pd.DataFrame(rows[:max_reviews])
+    # Naive datetimes, matching the Google Play rows they are merged with
+    df['date'] = pd.to_datetime(df['date'], utc=True, errors='coerce').dt.tz_localize(None)
+    df['platform'] = 'App Store'
+    df['likes'] = 0       # not exposed by the feed
+    df['reply'] = None    # not exposed by the feed
+    df['replied_at'] = None
+    return df
 
 
 # ---------------------------------------------------------------------------
@@ -376,7 +424,7 @@ def get_momentum(summary_stats, all_reviews):
 
         result['available'] = bool(result['platforms'])
     except Exception as e:
-        print(f"Error computing momentum: {e}")
+        logger.warning(f"Error computing momentum: {e}")
     return result
 
 
@@ -463,7 +511,7 @@ def get_response_analysis(df, lang_code='en'):
 
         result['available'] = result['total'] > 0
     except Exception as e:
-        print(f"Error analyzing developer responses: {e}")
+        logger.warning(f"Error analyzing developer responses: {e}")
     return result
 
 
@@ -550,7 +598,7 @@ def get_competitor_keyword_gap(stats_a, stats_b, lang_code='en', top_n=12):
         ][:top_n]
         result['available'] = bool(result['a_only'] or result['b_only'])
     except Exception as e:
-        print(f"Error building competitor keyword gap: {e}")
+        logger.warning(f"Error building competitor keyword gap: {e}")
     return result
 
 
@@ -576,7 +624,7 @@ def get_rating_distribution(df):
                     str(s): int(counts.get(s, 0)) for s in range(1, 6)
                 }
     except Exception as e:
-        print(f"Error calculating rating distribution: {e}")
+        logger.warning(f"Error calculating rating distribution: {e}")
     return result
 
 
@@ -645,7 +693,7 @@ def categorize_complaints(df, lang_code='en'):
 
         themes.sort(key=lambda x: x['priority_raw'], reverse=True)
     except Exception as e:
-        print(f"Error categorizing complaints: {e}")
+        logger.warning(f"Error categorizing complaints: {e}")
     return themes
 
 
@@ -668,7 +716,7 @@ def get_platform_comparison(df):
                 'avg_sentiment': round(float(group['sentiment'].mean()), 2) if not group['sentiment'].isna().all() else 0.0,
             })
     except Exception as e:
-        print(f"Error building platform comparison: {e}")
+        logger.warning(f"Error building platform comparison: {e}")
     return comparison
 
 
@@ -733,7 +781,7 @@ def get_emerging_keywords(df, top_n=10):
         result['previous_count'] = int(n_old)
         result['split_date'] = recent['dt'].iloc[0].strftime('%Y-%m-%d')
     except Exception as e:
-        print(f"Error computing emerging keywords: {e}")
+        logger.warning(f"Error computing emerging keywords: {e}")
     return result
 
 
@@ -764,7 +812,7 @@ def filter_by_date_range(df, start_date=None, end_date=None):
             mask &= dt <= end_inclusive
         return work[mask]
     except Exception as e:
-        print(f"Error filtering by date range: {e}")
+        logger.warning(f"Error filtering by date range: {e}")
         return df
 
 
@@ -799,7 +847,7 @@ def get_version_breakdown(df, top_n=8):
         grouped = grouped.sort_values('complaints', ascending=False).head(top_n)
         result = grouped.to_dict(orient='records')
     except Exception as e:
-        print(f"Error computing version breakdown: {e}")
+        logger.warning(f"Error computing version breakdown: {e}")
     return result
 
 
@@ -918,7 +966,7 @@ def get_sentiment(text, lang_code='en'):
             return TextBlob(text).sentiment.polarity
         return 0.0
     except Exception as e:
-        print(f"Could not process sentiment for a review. Error: {e}")
+        logger.warning(f"Could not process sentiment for a review. Error: {e}")
         return 0.0
 
 def preprocess_and_filter_complaints(df, threshold, app_name, lang_code, extra_stopwords_str=""):
@@ -1002,7 +1050,7 @@ def analyze_and_visualize(df, top_n, lang_code=None):
         trend_grouped['count'] = trend_grouped['count'].astype(int)
         trend_data = trend_grouped.to_dict(orient='records')
     except Exception as e:
-        print(f"Error calculating trend: {e}")
+        logger.warning(f"Error calculating trend: {e}")
 
     sample_reviews = []
     try:
@@ -1021,7 +1069,7 @@ def analyze_and_visualize(df, top_n, lang_code=None):
             cols.append('likes')
         sample_reviews = sample_df[cols].to_dict(orient='records')
     except Exception as e:
-        print(f"Error preparing sample reviews: {e}")
+        logger.warning(f"Error preparing sample reviews: {e}")
 
     # Themes, including the analysis language's keywords
     themes = categorize_complaints(df, lang_code)
@@ -1274,7 +1322,7 @@ def get_aso_report(summary_stats, all_reviews, lang_code='en', top_n=15):
 
         report['available'] = bool(report['metadata'] or report['keyword_opportunities'])
     except Exception as e:
-        print(f"Error building ASO report: {e}")
+        logger.warning(f"Error building ASO report: {e}")
 
     return report
 

@@ -1,8 +1,11 @@
 # review_analyzer/__init__.py
+import logging
 from urllib.parse import urlsplit
 
 from flask import Flask, abort, request
 import nltk
+
+logger = logging.getLogger(__name__)
 
 # Inline <script>/<style> blocks are used throughout the templates, hence
 # 'unsafe-inline'; the policy still pins every external origin. Store icons and
@@ -69,9 +72,9 @@ def download_nltk_data():
         # A more specific check for the 'stopwords' corpus
         nltk.data.find('corpora/stopwords')
     except LookupError:
-        print("NLTK 'stopwords' data not found. Downloading...")
+        logger.info("NLTK 'stopwords' data not found. Downloading...")
         _download()
-        print("Download complete.")
+        logger.info("Download complete.")
 
     # ASO keyword extraction filters to nouns via POS tagging (English only).
     # This is optional: if the tagger is unavailable the analyzer falls back to
@@ -79,11 +82,11 @@ def download_nltk_data():
     try:
         nltk.data.find('taggers/averaged_perceptron_tagger_eng')
     except LookupError:
-        print("NLTK POS tagger not found. Downloading (used for ASO keywords)...")
+        logger.info("NLTK POS tagger not found. Downloading (used for ASO keywords)...")
         try:
             _download('averaged_perceptron_tagger_eng')
         except Exception as e:
-            print(f"POS tagger download failed; ASO keywords will use basic filtering. ({e})")
+            logger.warning(f"POS tagger download failed; ASO keywords will use basic filtering. ({e})")
 
 
 def _download(package='stopwords'):

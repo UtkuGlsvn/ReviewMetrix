@@ -1,6 +1,12 @@
+import logging
 import os
 
 from reviewMetrix import create_app
+
+# Send the app's log records (scrape failures, tracebacks) to stderr, where
+# gunicorn and Render pick them up
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s %(levelname)s %(name)s: %(message)s')
 
 app = create_app()
 
