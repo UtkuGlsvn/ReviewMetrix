@@ -1660,7 +1660,7 @@
         <div class="grid-card full-width-card" style="margin-bottom: 30px;">
             <h3><span class="h3-label">🔧 Fix First — Prioritized Issues <span class="tip" data-tip="Themes ranked by (complaints + likes) times severity, not raw count. A few harsh, highly-liked complaints outrank many mild ones." tabindex="0" role="button" aria-label="Themes ranked by (complaints + likes) times severity, not raw count. A few harsh, highly-liked complaints outrank many mild ones.">?</span></span>
                 <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">
-                    priority = (complaints + likes) × severity
+                    priority = (complaints + likes) × severity × recency
                 </span>
             </h3>
             <div class="priority-table-wrapper">
@@ -1699,7 +1699,8 @@
             <p style="margin: 14px 0 0 0; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5;">
                 Ranked by impact rather than raw volume: each like counts as another affected user, and themes with
                 lower average ratings weigh more. A theme with few complaints but many likes can outrank a more
-                frequent but milder one.
+                frequent but milder one. Newer complaints weigh more: a complaint's weight halves every
+                {{ '%g'|format(priority_half_life_days) }} days before the newest review, so an already-fixed bug fades out of the ranking.
                 {% if not (themes | selectattr('likes') | list) %}
                 <br><em>Likes are only available for Google Play reviews.</em>
                 {% endif %}

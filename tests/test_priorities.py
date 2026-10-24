@@ -248,5 +248,48 @@ def test_results_page_renders_momentum_and_priorities(client, patched_fetch):
     assert 'Rating Momentum' in body
     assert 'data-panel="overview"' in body
     assert 'Fix First' in body
+    assert '30 days before the newest review' in body
     assert 'Users affected' in body
     assert 'data-tab="issues"' in body
+
+
+# ==========================================================================
+# Yenilik agirligi — duzeltilmis eski bir hata ust sirada kalmamali
+# ==========================================================================
+
+def test_fixed_old_bug_drops_below_recent_issue():
+    """Eski ama cok sayida crash sikayeti, yeni ama daha az login sikayetinin
+    gerisine dusmeli; ham adette yine onde gorunmeli."""
+    old = pd.Timestamp('2024-01-01')
+    new = pd.Timestamp('2024-06-01')
+    df = pd.DataFrame({
+        'review': ['app crash'] * 6 + ['login problem'] * 3,
+        'score': [1] * 9,
+        'likes': [0] * 9,
+        'date': [old] * 6 + [new] * 3,
+        'platform': ['Google Play'] * 9,
+    })
+    themes = analyzer.categorize_complaints(df)
+    by_theme = {t['theme']: t for t in themes}
+
+    crash = next(t for name, t in by_theme.items() if 'Crash' in name)
+    login = next(t for name, t in by_theme.items() if 'Login' in name)
+    assert crash['count'] > login['count']
+    assert crash['affected'] == 6, 'tablo ham etkilenen sayisini gostermeli'
+    assert themes[0] is login, f"siralama: {[t['theme'] for t in themes]}"
+
+
+def test_recency_weight_halves_per_half_life(monkeypatch):
+    monkeypatch.setattr(analyzer, 'PRIORITY_HALF_LIFE_DAYS', 10.0)
+    work = pd.DataFrame({'date': pd.to_datetime(['2024-01-21', '2024-01-11', '2024-01-01'])})
+    weights = analyzer._recency_weights(work).tolist()
+    assert weights == pytest.approx([1.0, 0.5, 0.25])
+
+
+def test_recency_disabled_or_undated_gives_equal_weight(monkeypatch):
+    undated = pd.DataFrame({'date': [None, 'not a date']})
+    assert analyzer._recency_weights(undated).tolist() == [1.0, 1.0]
+
+    monkeypatch.setattr(analyzer, 'PRIORITY_HALF_LIFE_DAYS', 0)
+    dated = pd.DataFrame({'date': pd.to_datetime(['2024-01-01', '2023-01-01'])})
+    assert analyzer._recency_weights(dated).tolist() == [1.0, 1.0]

@@ -139,6 +139,7 @@ def analyze_reviews():
             aso=report['aso'],
             momentum=report['momentum'],
             responses=report['responses'],
+            priority_half_life_days=analyzer.PRIORITY_HALF_LIFE_DAYS,
         )
     except Exception:
         logger.exception("%s failed", request.path)

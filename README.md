@@ -34,7 +34,7 @@ tab only.
 - **Dual-platform scraping** — Google Play and App Store in one run, merged into a single dataset with a `platform` column.
 - **Complaint filtering** — analyze only reviews at or below a score threshold (e.g. ≤ 2 stars).
 - **Rating momentum** — the store only ever shows the lifetime average, where millions of old reviews can hide a present-day collapse. This compares it against the scraped window and labels the gap. On Spotify: 4.34 lifetime vs 3.81 across the last 200 reviews.
-- **Fix First prioritization** — themes ranked by `(complaints + likes) × severity` rather than raw count, where severity is `5 − average rating`. A theme with two complaints, eight likes and a 1.0 average outranks one with seven mild complaints.
+- **Fix First prioritization** — themes ranked by `(complaints + likes) × severity` rather than raw count, where severity is `5 − average rating`. A theme with two complaints, eight likes and a 1.0 average outranks one with seven mild complaints. Each complaint is also weighted by recency — its weight halves every 30 days before the newest review — so a bug you already fixed fades out instead of topping the list for months.
 - **Rating distribution** — 1–5 star breakdown, overall and per platform.
 - **Complaint themes** — reviews are auto-categorized into 10 buckets (Crashes & Bugs, Performance, Ads, Login & Account, Price & Payment, UI & UX, Updates, Notifications, Customer Support, Privacy).
 - **Sentiment analysis** — polarity per review, aggregated into positive/neutral/negative and plotted over time.
@@ -184,6 +184,7 @@ Available at <http://127.0.0.1:4999>.
 | `TRUST_PROXY` | unset | Set to `1` only when behind a proxy that rewrites `X-Forwarded-For`. |
 | `CACHE_TTL_SECONDS` | `3600` | How long scraped reviews stay cached. |
 | `CACHE_MAX_ENTRIES` | `32` | Cached scrapes kept in memory. The main memory dial. |
+| `PRIORITY_HALF_LIFE_DAYS` | `30` | Fix First recency half-life in days. `0` disables recency weighting. |
 
 ### Rate limiting
 

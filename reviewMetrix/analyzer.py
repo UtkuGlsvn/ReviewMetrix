@@ -628,6 +628,25 @@ def get_rating_distribution(df):
     return result
 
 
+# A complaint loses half its weight in the priority score every this many days,
+# measured from the newest review in the set. Keeps a bug that has since been
+# fixed from topping Fix First for months on old reviews alone.
+PRIORITY_HALF_LIFE_DAYS = float(os.environ.get('PRIORITY_HALF_LIFE_DAYS', 30))
+
+
+def _recency_weights(work):
+    """Per-row weight in (0, 1]: 1 for the newest review, halving every
+    PRIORITY_HALF_LIFE_DAYS. Rows without a usable date get 1, so missing
+    dates never bury a complaint."""
+    if 'date' not in work.columns or PRIORITY_HALF_LIFE_DAYS <= 0:
+        return pd.Series(1.0, index=work.index)
+    dt = pd.to_datetime(work['date'], errors='coerce')
+    if dt.notna().sum() == 0:
+        return pd.Series(1.0, index=work.index)
+    age_days = (dt.max() - dt).dt.total_seconds() / 86400
+    return (0.5 ** (age_days / PRIORITY_HALF_LIFE_DAYS)).fillna(1.0)
+
+
 def categorize_complaints(df, lang_code='en'):
     """Group complaints into themes by keyword match.
 
@@ -642,8 +661,10 @@ def categorize_complaints(df, lang_code='en'):
         counts = {theme: 0 for theme in theme_keywords}
         likes = {theme: 0 for theme in theme_keywords}
         score_sums = {theme: 0.0 for theme in theme_keywords}
+        weighted = {theme: 0.0 for theme in theme_keywords}
 
         work = df.dropna(subset=['review']).copy()
+        work['recency'] = _recency_weights(work)
         # itertuples renames columns starting with an underscore to positional
         # names, so use a plain one
         work['text_lower'] = work['review'].astype(str).str.lower()
@@ -662,6 +683,7 @@ def categorize_complaints(df, lang_code='en'):
                 if any(kw in text for kw in keywords):
                     counts[theme] += 1
                     likes[theme] += row_likes
+                    weighted[theme] += (1 + row_likes) * row.recency
                     if row_score is not None and not pd.isna(row_score):
                         score_sums[theme] += float(row_score)
 
@@ -674,6 +696,8 @@ def categorize_complaints(df, lang_code='en'):
             # priority = affected users x severity
             #   affected = complaints + likes (a like is another "me too")
             #   severity = 5 - average rating (lower rating, worse problem)
+            # The score uses the recency-weighted affected count; the table
+            # still shows the raw one.
             affected = cnt + likes[theme]
             severity = (5 - avg_score) if avg_score is not None else 3.0
             themes.append({
@@ -683,7 +707,7 @@ def categorize_complaints(df, lang_code='en'):
                 'likes': likes[theme],
                 'avg_score': avg_score,
                 'affected': affected,
-                'priority_raw': round(affected * severity, 2),
+                'priority_raw': round(weighted[theme] * severity, 2),
             })
 
         # Normalise to 0-100 against the top theme, for display
