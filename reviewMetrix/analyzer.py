@@ -50,6 +50,9 @@ def parse_apple_name(value):
     return value
 
 
+ITUNES_TIMEOUT_SECONDS = 10
+
+
 def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fetch):
     all_dfs = []
     summary_stats = {'google': None, 'ios': None}
@@ -105,16 +108,21 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
             'icon': gp_details.get('icon'),
             'screenshots': (gp_details.get('screenshots') or [])[:MAX_SCREENSHOTS],
             'screenshot_count': len(gp_details.get('screenshots') or []),
-            'store_url': f'https://play.google.com/store/apps/details?id={google_id}',
+            'store_url': f'https://play.google.com/store/apps/details?id={urllib.parse.quote(google_id, safe="")}',
         }
     except Exception as e:
         print(f"Google Play fetch error->: {e}")
 
     # --- Apple Store: metadata via the iTunes API, reviews via the scraper ---
     try:
-        safe_apple_name = urllib.parse.quote(apple_name)
-        itunes_url = f"https://itunes.apple.com/search?term={safe_apple_name}&country={country}&entity=software&limit=1"
-        itunes_resp = requests.get(itunes_url)
+        # params= URL-encodes every value; the timeout keeps a hung API from
+        # pinning one of gunicorn's few worker threads indefinitely
+        itunes_resp = requests.get(
+            "https://itunes.apple.com/search",
+            params={'term': apple_name, 'country': country,
+                    'entity': 'software', 'limit': 1},
+            timeout=ITUNES_TIMEOUT_SECONDS,
+        )
         
         if itunes_resp.status_code == 200 and itunes_resp.json().get('resultCount', 0) > 0:
             app_data = itunes_resp.json()['results'][0]
@@ -131,7 +139,8 @@ def fetch_reviews_store(google_id, apple_name, country, lang, max_reviews_to_fet
                 'icon': app_data.get('artworkUrl512') or app_data.get('artworkUrl100'),
                 'screenshots': (app_data.get('screenshotUrls') or [])[:MAX_SCREENSHOTS],
                 'screenshot_count': len(app_data.get('screenshotUrls') or []),
-                'store_url': app_data.get('trackViewUrl'),
+                # Rendered as a link, so only an https URL is accepted
+                'store_url': app_data.get('trackViewUrl') if str(app_data.get('trackViewUrl', '')).startswith('https://') else None,
             }
     except Exception as e:
         print(f"iTunes API Error ->: {e}")

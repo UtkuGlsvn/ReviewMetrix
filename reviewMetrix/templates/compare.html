@@ -10,7 +10,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts@8.4.1/dist/apexcharts.min.js" integrity="sha384-nM4rxuFWe8XV3+PtI+Xv1kbHm6cnrx3jztxEHd68KBnPbVUMGD8FgORcXPDEaFo3" crossorigin="anonymous"></script>
     <style>
         :root {
             --bg-color: #0b0f19;
@@ -657,6 +657,12 @@
             const sentA = {{ app_a.sentiment_summary | tojson | safe }};
             const sentB = {{ app_b.sentiment_summary | tojson | safe }};
 
+            // App names can be raw user input (when the store lookup fails) and
+            // ApexCharts writes tooltip series names with innerHTML.
+            const escapeHtml = s => String(s).replace(/[&<>"']/g,
+                c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            const safeTitle = { formatter: escapeHtml };
+
             const baseOptions = {
                 theme: { mode: 'dark' },
                 chart: { background: 'transparent', foreColor: '#9ca3af', fontFamily: 'Plus Jakarta Sans, sans-serif', toolbar: { show: false } },
@@ -682,7 +688,7 @@
                 ],
                 xaxis: { categories: allThemes, labels: { formatter: v => v + '%' } },
                 legend: { position: 'top' },
-                tooltip: { y: { formatter: v => v + '%' } }
+                tooltip: { y: { formatter: v => v + '%', title: safeTitle } }
             }).render();
 
             // --- Rating distribution (percent) ---
@@ -702,7 +708,7 @@
                 xaxis: { categories: ['1★', '2★', '3★', '4★', '5★'] },
                 yaxis: { labels: { formatter: v => v + '%' } },
                 legend: { position: 'top' },
-                tooltip: { y: { formatter: v => v + '%' } }
+                tooltip: { y: { formatter: v => v + '%', title: safeTitle } }
             }).render();
 
             // --- Sentiment breakdown (grouped) ---
@@ -718,7 +724,8 @@
                     { name: nameB, data: sentSeriesB }
                 ],
                 xaxis: { categories: ['Positive', 'Neutral', 'Negative'] },
-                legend: { show: false }
+                legend: { show: false },
+                tooltip: { y: { title: safeTitle } }
             }).render();
         </script>
         {% endif %}

@@ -17,15 +17,14 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     # app-store-scraper pins requests==2.23, whose urllib3 breaks on Python 3.12;
     # install it without deps so the modern requests above is used
-    && pip install --no-cache-dir --no-deps app-store-scraper
+    && pip install --no-cache-dir --no-deps app-store-scraper==0.3.5
 
 COPY reviewMetrix/ ./reviewMetrix/
 COPY run.py .
 
 # Fetch NLTK corpora at build time so the container never reaches out on first
 # request. This calls the application's own downloader rather than duplicating
-# the logic, so the SSL fallback and the "tagger is optional" behaviour stay in
-# one place. Importing the package does not start the app.
+# the logic, so the "tagger is optional" behaviour stays in one place. Importing the package does not start the app.
 RUN mkdir -p "$NLTK_DATA" \
     && python -c "from reviewMetrix import download_nltk_data; download_nltk_data()" \
     && python -c "import nltk; nltk.data.find('corpora/stopwords')"

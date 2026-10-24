@@ -157,7 +157,7 @@ source venv/bin/activate        # Windows: .\venv\Scripts\activate
 
 ```bash
 pip install -r requirements.txt
-pip install --no-deps app-store-scraper  # its requests==2.23 pin breaks on Python 3.12
+pip install --no-deps app-store-scraper==0.3.5  # its requests==2.23 pin breaks on Python 3.12
 ```
 
 NLTK stopwords and the POS tagger are downloaded automatically on first run.

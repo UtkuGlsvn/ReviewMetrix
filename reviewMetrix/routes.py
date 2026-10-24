@@ -1,4 +1,5 @@
 import logging
+import re
 
 from flask import Blueprint, request, render_template
 from . import analyzer
@@ -59,11 +60,23 @@ def _clamp(value, low, high, default):
         return default
 
 
+# Both values end up in store URLs, so anything that is not code-shaped is
+# rejected rather than passed through. Languages may carry a region (zh-TW).
+_COUNTRY_RE = re.compile(r'^[a-z]{2}$')
+_LANGUAGE_RE = re.compile(r'^[a-z]{2,3}(-[a-z0-9]{2,4})?$', re.IGNORECASE)
+
+
+def _code(value, pattern, default):
+    """Return a stripped store code if it matches pattern, otherwise default."""
+    value = (value or '').strip()
+    return value if pattern.match(value) else default
+
+
 def _parse_common_params():
     """Read, coerce and bound the form fields shared by every route."""
     return {
-        'country': (request.form.get('country', '') or 'us').strip()[:5],
-        'language': (request.form.get('language', '') or 'en').strip()[:5],
+        'country': _code(request.form.get('country', '').lower(), _COUNTRY_RE, 'us'),
+        'language': _code(request.form.get('language'), _LANGUAGE_RE, 'en'),
         'max_reviews': _clamp(request.form.get('max_reviews'), 10, MAX_REVIEWS_CAP, 100),
         'complaint_threshold': _clamp(request.form.get('complaint_threshold'), 1, 5, 2),
         'top_words': _clamp(request.form.get('top_words'), 1, TOP_WORDS_CAP, 20),
@@ -182,11 +195,11 @@ def compare_countries():
         apple_name = analyzer.parse_apple_name(request.form.get('apple_name', ''))
 
         countries_raw = request.form.get('countries', '')
-        # Parse country codes, drop duplicates, cap at six
+        # Parse country codes, drop malformed ones and duplicates, cap at six
         seen, countries = set(), []
         for c in countries_raw.split(','):
             code = c.strip().lower()
-            if code and code not in seen:
+            if _COUNTRY_RE.match(code) and code not in seen:
                 seen.add(code)
                 countries.append(code)
         countries = countries[:6]
