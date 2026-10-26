@@ -1,0 +1,25 @@
+tests/test_priorities.py
+  s_208115731dc080::t_7570e879a75851 296-404
+reviewMetrix/analyzer.py
+  s_208115731dc080::t_722272182317e1 3,651-720,736-738,742,761-768,773-774,780,783-785,788-790,798-799
+reviewMetrix/templates/results.html
+  s_208115731dc080::t_7491857fdc4761 1176-1195,1683,1701-1706,1729-1731
+README.md
+  s_208115731dc080::t_7491857fdc4761 33,184,287
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fb80bce1039861876b402bdc34e6c95c8c35161f",
+  "prompts": {},
+  "sessions": {
+    "s_208115731dc080": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c9b1965-9170-40db-87bf-1b60547133f7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "utku glsvn <utku.glsvn@gmail.com>"
+    }
+  }
+}
