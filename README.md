@@ -30,7 +30,7 @@ tab only.
 - **Dual-platform scraping** — Google Play and App Store in one run, merged into a single dataset with a `platform` column.
 - **Complaint filtering** — analyze only reviews at or below a score threshold (e.g. ≤ 2 stars).
 - **Rating momentum** — the store only ever shows the lifetime average, where millions of old reviews can hide a present-day collapse. This compares it against the scraped window and labels the gap. On Spotify: 4.34 lifetime vs 3.81 across the last 200 reviews.
-- **Fix First prioritization** — themes ranked by `(complaints + likes) × severity` rather than raw count, where severity is `5 − average rating`. A theme with two complaints, eight likes and a 1.0 average outranks one with seven mild complaints. Each complaint is also weighted by recency — its weight halves every 30 days before the newest review — so a bug you already fixed fades out instead of topping the list for months.
+- **Fix First prioritization** — themes ranked by `(complaints + likes) × severity` rather than raw count, where severity is `5 − average rating`. A theme with two complaints, eight likes and a 1.0 average outranks one with seven mild complaints. Each complaint is also weighted by recency — its weight halves every 30 days before the newest review — so a bug you already fixed fades out instead of topping the list for months. Likes count on a log scale (`1 + ln(1 + likes)` per review), so a single viral review can't bury a new wave of complaints. The ranking is also version-aware: each theme's share of complaints on the latest app version (per platform) is compared with older versions. A theme with none on the latest version is marked *Likely fixed* and its priority drops to a quarter; one whose share grew is marked *Rising* (or *New in latest*) and boosted up to 2×. Versions are only judged once the latest one has enough complaints.
 - **Rating distribution** — 1–5 star breakdown, overall and per platform.
 - **Complaint themes** — reviews are auto-categorized into 10 buckets (Crashes & Bugs, Performance, Ads, Login & Account, Price & Payment, UI & UX, Updates, Notifications, Customer Support, Privacy).
 - **Sentiment analysis** — polarity per review, aggregated into positive/neutral/negative and plotted over time.
@@ -181,6 +181,7 @@ Available at <http://127.0.0.1:4999>.
 | `CACHE_TTL_SECONDS` | `3600` | How long scraped reviews stay cached. |
 | `CACHE_MAX_ENTRIES` | `32` | Cached scrapes kept in memory. The main memory dial. |
 | `PRIORITY_HALF_LIFE_DAYS` | `30` | Fix First recency half-life in days. `0` disables recency weighting. |
+| `PRIORITY_VERSION_MIN_COMPLAINTS` | `10` | Complaints the latest app version needs before Fix First compares themes across versions. |
 
 ### Rate limiting
 
@@ -283,7 +284,7 @@ pytest
 - `tests/test_cache.py` — cache hit/miss, TTL expiry, force refresh, empty results not cached, mutation isolation, LRU eviction order, and route-level caching.
 - `tests/test_multilingual.py` — per-language sentiment and themes, negation handling, and the UI degradation for unsupported languages.
 - `tests/test_aso.py` — listing health thresholds, keyword gap, phrase detection, noise filtering, and graceful fallback without the POS tagger.
-- `tests/test_priorities.py` — momentum thresholds and per-platform scoping, priority ranking against raw volume, likes as affected users, and review ordering.
+- `tests/test_priorities.py` — momentum thresholds and per-platform scoping, priority ranking against raw volume, likes as affected users, log-scaled likes, version-aware demotion and boosting, and review ordering.
 - `tests/test_responses.py` — reply rates, median reply time, per-theme gaps, competitor keyword gap, and the POS context fix.
 - `tests/test_ratelimit.py` — window mechanics, per-unit costs, rejected requests not being recorded, IP isolation, stale-key eviction and the X-Forwarded-For trust boundary.
 - `tests/test_prompts.py` — prompt front-matter parsing (placeholders preserved), loaded counts matching the files on disk, ordering, caching, and the page rendering its tabs and copy handler.
