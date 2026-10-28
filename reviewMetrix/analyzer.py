@@ -429,6 +429,121 @@ def get_momentum(summary_stats, all_reviews):
     return result
 
 
+# Windows the Average Rating card can switch between, in days
+RATING_TIMELINE_WINDOWS = (7, 30, 90)
+
+
+def _release_days(df):
+    """Day each newer app version first shows up in the reviews, as a proxy for
+    its release date: [(day, version)], oldest first.
+
+    Versions already present on the first day are the baseline (released before
+    the scraped window), and a straggler review on an older version is never
+    taken for a release."""
+    if 'version' not in df.columns:
+        return []
+    work = df[['day', 'version']].copy()
+    work['key'] = work['version'].map(_version_key)
+    work = work.dropna(subset=['key'])
+    if work.empty:
+        return []
+    first = (work.sort_values('day')
+             .groupby('key', sort=False)
+             .agg(day=('day', 'first'), version=('version', 'first'))
+             .reset_index()
+             .sort_values(['day', 'key']))
+    first_day = first['day'].iloc[0]
+    newest = max(first.loc[first['day'] == first_day, 'key'])
+    releases = []
+    for row in first[first['day'] > first_day].itertuples(index=False):
+        if row.key > newest:
+            releases.append((row.day, str(row.version).strip()))
+            newest = row.key
+    return releases
+
+
+def get_rating_timeline(df, windows=RATING_TIMELINE_WINDOWS):
+    """Daily average star rating per platform, in the style of the Play
+    Console's Average rating card.
+
+    For every platform (plus 'All') and window length it returns the per-day
+    average (None on days without reviews, so the line breaks there), the
+    window's average, the change against the window before it, and the days a
+    new app version first appeared. Windows end on the newest review.
+    """
+    result = {'available': False, 'platforms': [], 'windows': list(windows),
+              'end_date': None, 'series': {}}
+    if df is None or df.empty or 'score' not in df.columns or 'date' not in df.columns:
+        return result
+    try:
+        work = df.copy()
+        work['score'] = pd.to_numeric(work['score'], errors='coerce')
+        work['day'] = pd.to_datetime(work['date'], errors='coerce').dt.normalize()
+        work = work.dropna(subset=['score', 'day'])
+        if work.empty:
+            return result
+
+        end = work['day'].max()
+        result['end_date'] = end.strftime('%Y-%m-%d')
+
+        groups = [('All', work)]
+        if 'platform' in work.columns:
+            for platform in ('Google Play', 'App Store'):
+                subset = work[work['platform'] == platform]
+                if not subset.empty:
+                    groups.append((platform, subset))
+        # 'All' only adds something when there is more than one platform
+        if len(groups) == 2:
+            groups = groups[1:]
+
+        for name, subset in groups:
+            if name == 'All' and 'platform' in subset.columns:
+                releases = [(day, version, platform)
+                            for platform, part in subset.groupby('platform')
+                            for day, version in _release_days(part)]
+            else:
+                releases = [(day, version, name) for day, version in _release_days(subset)]
+            daily = subset.groupby('day')['score'].agg(['sum', 'count'])
+
+            per_window = {}
+            for w in windows:
+                start = end - pd.Timedelta(days=w - 1)
+                days = pd.date_range(start, end, freq='D')
+                sums = daily['sum'].reindex(days)
+                counts = daily['count'].reindex(days).fillna(0).astype(int)
+
+                current = subset.loc[subset['day'] >= start, 'score']
+                previous = subset.loc[(subset['day'] >= start - pd.Timedelta(days=w))
+                                      & (subset['day'] < start), 'score']
+                average = round(float(current.mean()), 2) if len(current) else None
+                prev_average = round(float(previous.mean()), 2) if len(previous) else None
+                delta = (round(average - prev_average, 2)
+                         if average is not None and prev_average is not None else None)
+
+                per_window[str(w)] = {
+                    'days': [d.strftime('%Y-%m-%d') for d in days],
+                    'avg': [round(float(sm) / c, 2) if c else None
+                            for sm, c in zip(sums, counts)],
+                    'count': counts.tolist(),
+                    'average': average,
+                    'reviews': int(len(current)),
+                    'previous_average': prev_average,
+                    'previous_reviews': int(len(previous)),
+                    'delta': delta,
+                    'releases': [{'date': day.strftime('%Y-%m-%d'), 'version': version,
+                                  'platform': platform}
+                                 for day, version, platform in sorted(releases)
+                                 if start <= day <= end],
+                }
+            result['series'][name] = per_window
+            result['platforms'].append(name)
+
+        result['available'] = bool(result['platforms'])
+    except Exception as e:
+        logger.warning(f"Error computing rating timeline: {e}")
+    return result
+
+
 def get_response_analysis(df, lang_code='en'):
     """Analyse the developer's replies to reviews.
 
@@ -1468,6 +1583,8 @@ def build_app_report(google_id, apple_name, country, language, max_reviews,
         'aso': {'metadata': [], 'keyword_opportunities': [], 'listing_keywords': [],
                 'reviews_analyzed': 0, 'available': False},
         'momentum': {'platforms': [], 'available': False},
+        'rating_timeline': {'available': False, 'platforms': [], 'windows': [],
+                            'end_date': None, 'series': {}},
         'responses': {'available': False, 'total': 0, 'replied': 0, 'response_rate': 0.0,
                       'complaints_total': 0, 'complaints_replied': 0,
                       'complaint_response_rate': 0.0, 'median_hours': None, 'by_theme': []},
@@ -1502,6 +1619,7 @@ def build_app_report(google_id, apple_name, country, language, max_reviews,
     # ASO and momentum ignore the complaint filter and use all reviews
     report['aso'] = get_aso_report(summary_stats, all_reviews, language)
     report['momentum'] = get_momentum(summary_stats, all_reviews)
+    report['rating_timeline'] = get_rating_timeline(all_reviews)
     report['responses'] = get_response_analysis(all_reviews, language)
 
     complaints = preprocess_and_filter_complaints(

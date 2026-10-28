@@ -566,6 +566,92 @@
             color: #f472b6;
         }
 
+        /* Average rating card */
+        .rt-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .rt-value {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.4rem;
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
+        .rt-delta {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 6px;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .rt-delta-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            font-size: 0.8rem;
+        }
+
+        .rt-delta.is-down { color: var(--red); }
+        .rt-delta.is-down .rt-delta-icon { background: rgba(239, 68, 68, 0.15); }
+        .rt-delta.is-up { color: var(--green); }
+        .rt-delta.is-up .rt-delta-icon { background: rgba(16, 185, 129, 0.15); }
+        .rt-delta.is-flat { color: var(--text-secondary); }
+        .rt-delta.is-flat .rt-delta-icon { background: rgba(156, 163, 175, 0.15); }
+
+        .rt-sub {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 6px;
+        }
+
+        .rt-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .rt-seg {
+            display: inline-flex;
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .rt-seg button {
+            background: transparent;
+            border: 0;
+            color: var(--text-secondary);
+            font: inherit;
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 7px 12px;
+            cursor: pointer;
+        }
+
+        .rt-seg button + button {
+            border-left: 1px solid var(--card-border);
+        }
+
+        .rt-seg button.is-active {
+            background: rgba(139, 92, 246, 0.2);
+            color: var(--text-primary);
+        }
+
+        .rt-seg button:focus-visible {
+            outline: 2px solid var(--accent-primary);
+            outline-offset: -2px;
+        }
+
         /* Rating momentum */
         .momentum-grid {
             display: grid;
@@ -1565,6 +1651,38 @@
             {% endif %}
         </div>
 
+        {% if rating_timeline and rating_timeline.available %}
+        <div id="avg-rating" class="section-anchor"></div>
+        <div class="grid-card full-width-card" style="margin-bottom: 30px;">
+            <div class="rt-head">
+                <div>
+                    <h3 style="margin-bottom: 8px;"><span class="h3-label">⭐ Average Rating <span class="tip" data-tip="Daily average star rating of the scraped reviews, compared with the period before. Gaps are days without reviews; grey squares mark the day a new app version first appeared." tabindex="0" role="button" aria-label="Daily average star rating of the scraped reviews, compared with the period before. Gaps are days without reviews; grey squares mark the day a new app version first appeared.">?</span></span></h3>
+                    <div class="rt-value"><span id="rtAverage">—</span> ★</div>
+                    <div class="rt-delta is-flat" id="rtDelta">
+                        <span class="rt-delta-icon" id="rtDeltaIcon">–</span>
+                        <span id="rtDeltaText">—</span>
+                    </div>
+                    <div class="rt-sub" id="rtSub"></div>
+                </div>
+                <div class="rt-controls">
+                    {% if rating_timeline.platforms | length > 1 %}
+                    <div class="rt-seg" role="group" aria-label="Platform">
+                        {% for p in rating_timeline.platforms %}
+                        <button type="button" data-rt-platform="{{ p }}" aria-pressed="{{ 'true' if loop.first else 'false' }}"{% if loop.first %} class="is-active"{% endif %}>{{ p }}</button>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <div class="rt-seg" role="group" aria-label="Period">
+                        {% for w in rating_timeline.windows %}
+                        <button type="button" data-rt-window="{{ w }}" aria-pressed="{{ 'true' if w == 30 else 'false' }}"{% if w == 30 %} class="is-active"{% endif %}>{{ w }}d</button>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div id="ratingTimelineChart" style="margin-top: 10px;"></div>
+        </div>
+        {% endif %}
+
         {% if momentum and momentum.available %}
         <div id="momentum" class="section-anchor"></div>
         <div class="grid-card full-width-card" style="margin-bottom: 30px;">
@@ -2227,6 +2345,138 @@
             legend: { position: 'top' }
         };
         registerChart('overview', () => new ApexCharts(document.querySelector("#ratingDistChart"), ratingDistOptions).render());
+        {% endif %}
+
+        // Average Rating card: platform and period toggles update it in place
+        {% if rating_timeline and rating_timeline.available %}
+        (() => {
+            const timeline = {{ rating_timeline | tojson | safe }};
+            const state = { platform: timeline.platforms[0], window: '30' };
+            const platformColors = { 'All': '#a78bfa', 'Google Play': '#60a5fa', 'App Store': '#f472b6' };
+            let chart = null;
+
+            const current = () => timeline.series[state.platform][state.window];
+
+            // Versions that first appeared on each day, for the tooltip
+            function releasesByDay(data) {
+                const tagged = state.platform === 'All';
+                const byDay = {};
+                data.releases.forEach(r => {
+                    const label = (tagged ? (r.platform === 'App Store' ? 'iOS ' : 'Android ') : '') +
+                        'v' + String(r.version).replace(/^v/i, '');
+                    (byDay[r.date] = byDay[r.date] || []).push(label);
+                });
+                return byDay;
+            }
+
+            // A grey square under the line on release days, like the Play Console
+            function releaseAnnotations(data) {
+                return Object.keys(releasesByDay(data)).map(day => ({
+                    x: new Date(day + 'T00:00:00').getTime(),
+                    y: 0.4,
+                    marker: { size: 4, shape: 'square', fillColor: '#6b7280', strokeColor: '#6b7280', strokeWidth: 0 },
+                    label: { text: '', borderWidth: 0 }
+                }));
+            }
+
+            function seriesFor(data) {
+                return [{
+                    name: 'Average rating',
+                    data: data.days.map((d, i) => ({ x: new Date(d + 'T00:00:00').getTime(), y: data.avg[i] }))
+                }];
+            }
+
+            function updateSummary(data) {
+                document.getElementById('rtAverage').textContent =
+                    data.average === null ? '—' : data.average.toFixed(2);
+                const box = document.getElementById('rtDelta');
+                const icon = document.getElementById('rtDeltaIcon');
+                const text = document.getElementById('rtDeltaText');
+                box.classList.remove('is-up', 'is-down', 'is-flat');
+                if (data.delta === null) {
+                    box.classList.add('is-flat');
+                    icon.textContent = '–';
+                    text.textContent = 'no reviews in the previous ' + state.window + ' days';
+                } else {
+                    const cls = data.delta < 0 ? 'is-down' : data.delta > 0 ? 'is-up' : 'is-flat';
+                    box.classList.add(cls);
+                    icon.textContent = data.delta < 0 ? '↓' : data.delta > 0 ? '↑' : '–';
+                    text.textContent = (data.delta > 0 ? '+' : '') + data.delta.toFixed(2);
+                }
+                document.getElementById('rtSub').textContent =
+                    data.reviews + ' reviews in the last ' + state.window + ' days to ' + timeline.end_date +
+                    (data.previous_average !== null
+                        ? ' · previous ' + state.window + ' days: ' + data.previous_average.toFixed(2) +
+                          ' from ' + data.previous_reviews + ' reviews'
+                        : '');
+            }
+
+            function options(data) {
+                return {
+                    ...chartThemeOptions,
+                    chart: { ...chartThemeOptions.chart, type: 'line', height: 260, toolbar: { show: false },
+                             zoom: { enabled: false }, animations: { enabled: false } },
+                    series: seriesFor(data),
+                    colors: [platformColors[state.platform] || '#a78bfa'],
+                    stroke: { curve: 'straight', width: 2.5 },
+                    markers: { size: data.days.length <= 31 ? 3 : 2, hover: { size: 5 } },
+                    dataLabels: { enabled: false },
+                    xaxis: { type: 'datetime', labels: { datetimeUTC: false } },
+                    // 0 leaves a strip under 1★ for the release squares
+                    yaxis: { min: 0, max: 5, tickAmount: 5, labels: { formatter: v => v < 1 ? '' : v.toFixed(0) } },
+                    annotations: { points: releaseAnnotations(data) },
+                    tooltip: {
+                        x: { format: 'dd MMM yyyy' },
+                        y: {
+                            formatter: (val, opt) => {
+                                const data = current();
+                                const released = releasesByDay(data)[data.days[opt.dataPointIndex]];
+                                const note = released ? ' · new: ' + released.join(', ') : '';
+                                if (val === null || val === undefined) return 'no reviews' + note;
+                                const n = data.count[opt.dataPointIndex];
+                                return val.toFixed(2) + ' ★ (' + n + (n === 1 ? ' review)' : ' reviews)') + note;
+                            }
+                        }
+                    },
+                    legend: { show: false }
+                };
+            }
+
+            function update() {
+                const data = current();
+                updateSummary(data);
+                if (chart) {
+                    chart.updateOptions({
+                        series: seriesFor(data),
+                        colors: [platformColors[state.platform] || '#a78bfa'],
+                        markers: { size: data.days.length <= 31 ? 3 : 2 },
+                        annotations: { points: releaseAnnotations(data) }
+                    });
+                }
+            }
+
+            function bindToggle(attr, key) {
+                document.querySelectorAll('[' + attr + ']').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        state[key] = btn.getAttribute(attr);
+                        document.querySelectorAll('[' + attr + ']').forEach(b => {
+                            const on = b === btn;
+                            b.classList.toggle('is-active', on);
+                            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+                        });
+                        update();
+                    });
+                });
+            }
+
+            bindToggle('data-rt-platform', 'platform');
+            bindToggle('data-rt-window', 'window');
+            updateSummary(current());
+            registerChart('overview', () => {
+                chart = new ApexCharts(document.querySelector('#ratingTimelineChart'), options(current()));
+                chart.render();
+            });
+        })();
         {% endif %}
 
         // 5. Complaint Themes (horizontal bar)

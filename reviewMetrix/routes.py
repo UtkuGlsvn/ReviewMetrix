@@ -138,6 +138,7 @@ def analyze_reviews():
             lang_code=report['lang_code'],
             aso=report['aso'],
             momentum=report['momentum'],
+            rating_timeline=report['rating_timeline'],
             responses=report['responses'],
             priority_half_life_days=analyzer.PRIORITY_HALF_LIFE_DAYS,
         )
