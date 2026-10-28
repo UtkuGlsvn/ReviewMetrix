@@ -293,3 +293,112 @@ def test_recency_disabled_or_undated_gives_equal_weight(monkeypatch):
     monkeypatch.setattr(analyzer, 'PRIORITY_HALF_LIFE_DAYS', 0)
     dated = pd.DataFrame({'date': pd.to_datetime(['2024-01-01', '2023-01-01'])})
     assert analyzer._recency_weights(dated).tolist() == [1.0, 1.0]
+
+
+# ==========================================================================
+# Log olcekli begeni ve surum farkindaligi
+# ==========================================================================
+
+def _versioned(rows, platform='Google Play'):
+    """rows: (review, likes, version, days_ago) dortlulerinden DataFrame uretir."""
+    now = pd.Timestamp('2024-06-30')
+    return pd.DataFrame({
+        'review': [r[0] for r in rows],
+        'score': [1] * len(rows),
+        'likes': [r[1] for r in rows],
+        'version': [r[2] for r in rows],
+        'date': [now - pd.Timedelta(days=r[3]) for r in rows],
+        'platform': [platform] * len(rows),
+    })
+
+
+def _theme(themes, word):
+    return next(t for t in themes if word in t['theme'])
+
+
+def test_likes_weigh_on_log_scale():
+    """Bir yorumun 500 begenisi, 500 ayri sikayet kadar agir sayilmamali."""
+    df = _df([('app crash', 1, 500)] + [('login problem', 1, 0)] * 10)
+    themes = analyzer.categorize_complaints(df)
+
+    assert themes[0]['theme'].startswith('Login'), [t['theme'] for t in themes]
+    assert _theme(themes, 'Crash')['affected'] == 501, 'tablo ham sayiyi gostermeli'
+
+
+def test_viral_old_crash_drops_below_new_login_issue():
+    """Analizdeki senaryo: eski surumde 500 begenili crash, yeni surumde 10
+    login sikayeti. Crash son surumde yok -> muhtemelen duzeldi."""
+    df = _versioned([('app crash', 500, '3.1', 30)]
+                    + [('login problem', 0, '4.0', d % 3) for d in range(10)])
+    themes = analyzer.categorize_complaints(df)
+
+    assert themes[0]['theme'].startswith('Login')
+    assert _theme(themes, 'Crash')['version_status'] == 'likely_fixed'
+    assert _theme(themes, 'Login')['version_status'] == 'new'
+
+
+def test_theme_missing_from_latest_version_is_demoted():
+    rows = ([('app crash', 0, '1.0', 5)] * 10
+            + [('too many ads', 0, '1.0', 5)] * 10
+            + [('too many ads', 0, '1.1', 0)] * 10)
+    themes = analyzer.categorize_complaints(_versioned(rows))
+    crash = _theme(themes, 'Crash')
+
+    assert crash['version_status'] == 'likely_fixed'
+    # Ayni tarih ve adette surum bilgisi olmasa oncelikler esit olurdu
+    undated = analyzer.categorize_complaints(_versioned(rows).drop(columns='version'))
+    assert crash['priority_raw'] == pytest.approx(
+        _theme(undated, 'Crash')['priority_raw'] * analyzer.PRIORITY_FIXED_FACTOR, abs=0.01)
+
+
+def test_theme_growing_on_latest_version_is_boosted():
+    # Eski surum: 20 sikayetin 2'si login (%10). Yeni surum: 10'un 5'i (%50).
+    rows = ([('login problem', 0, '2.0', 10)] * 2 + [('too many ads', 0, '2.0', 10)] * 18
+            + [('login problem', 0, '2.1', 0)] * 5 + [('too many ads', 0, '2.1', 0)] * 5)
+    themes = analyzer.categorize_complaints(_versioned(rows))
+    login = _theme(themes, 'Login')
+
+    assert login['version_status'] == 'rising'
+    plain = analyzer.categorize_complaints(_versioned(rows).drop(columns='version'))
+    assert login['priority_raw'] == pytest.approx(
+        _theme(plain, 'Login')['priority_raw'] * analyzer.PRIORITY_MAX_BOOST, abs=0.01)
+    assert _theme(themes, 'Ads')['version_status'] is None
+
+
+def test_small_latest_version_sample_is_not_judged():
+    """Yeni surumde birkac yorum varken eski temalar 'duzeldi' sayilmamali."""
+    rows = [('app crash', 0, '1.0', 5)] * 10 + [('too many ads', 0, '1.1', 0)] * 3
+    themes = analyzer.categorize_complaints(_versioned(rows))
+    assert all(t['version_status'] is None for t in themes)
+
+
+def test_versions_compared_per_platform():
+    """iOS ve Android surum numaralari bagimsizdir; Android'in 9.0'i iOS'un
+    2.0'ini 'eski' yapmamali."""
+    android = _versioned([('app crash', 0, '8.0', 5)] * 10 + [('too many ads', 0, '9.0', 0)] * 10)
+    ios = _versioned([('app crash', 0, '2.0', 0)] * 10, platform='App Store')
+    themes = analyzer.categorize_complaints(pd.concat([android, ios], ignore_index=True))
+
+    assert _theme(themes, 'Crash')['version_status'] is None, \
+        'crash iOS son surumunde hala var'
+
+
+def test_version_key_orders_numerically():
+    assert analyzer._version_key('4.10.0') > analyzer._version_key('4.9.3')
+    assert analyzer._version_key('4.0') == analyzer._version_key('4.0.0')
+    assert analyzer._version_key(None) is None
+    assert analyzer._version_key('beta') is None
+
+
+def test_results_page_shows_version_badge(client, monkeypatch):
+    rows = [('app crash', 0, '1.0', 5)] * 10 + [('too many ads', 0, '1.1', 0)] * 10
+    df = _versioned(rows)
+    monkeypatch.setattr(analyzer, 'fetch_reviews_store',
+                        lambda *a: (df.copy(), _stats(google_rating=4.0)))
+    resp = client.post('/analyze', data={
+        'google_id': 'com.mock.app', 'apple_name': 'mockapp',
+        'country': 'us', 'language': 'en', 'max_reviews': '50',
+        'complaint_threshold': '2', 'top_words': '10', 'refresh': '1',
+    })
+    assert resp.status_code == 200
+    assert 'LIKELY FIXED' in resp.data.decode()

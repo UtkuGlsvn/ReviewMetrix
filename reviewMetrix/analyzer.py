@@ -1,5 +1,6 @@
 # reviewMetrix/analyzer.py
 import logging
+import math
 import pandas as pd
 from nltk.corpus import stopwords
 import os
@@ -647,6 +648,76 @@ def _recency_weights(work):
     return (0.5 ** (age_days / PRIORITY_HALF_LIFE_DAYS)).fillna(1.0)
 
 
+# Version-aware priority: each theme's share of complaints on the latest app
+# version is compared with its share on older ones. Platforms are judged
+# separately because Android and iOS number their releases independently, and
+# only once the latest version has this many complaints, so a release that is
+# a day old does not "fix" every theme it has not been reviewed for yet.
+PRIORITY_VERSION_MIN_COMPLAINTS = int(os.environ.get('PRIORITY_VERSION_MIN_COMPLAINTS', 10))
+# Weight of a theme with no complaints at all on the latest version
+PRIORITY_FIXED_FACTOR = 0.25
+# A theme whose share grew by at least this ratio counts as rising...
+PRIORITY_RISING_RATIO = 1.25
+# ...and its priority is multiplied by that ratio, capped here
+PRIORITY_MAX_BOOST = 2.0
+
+
+def _version_key(value):
+    """'4.10.2' -> (4, 10, 2) so versions sort numerically. Trailing zeros are
+    dropped so 4.0 and 4.0.0 match. None when there are no digits."""
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    parts = [int(p) for p in re.findall(r'\d+', str(value))]
+    while len(parts) > 1 and parts[-1] == 0:
+        parts.pop()
+    return tuple(parts) or None
+
+
+def _version_groups(work):
+    """Per-row 'latest' or 'older' against the newest version of that row's
+    platform (None when the version is unknown), and a per-row flag for whether
+    that platform's latest version has enough complaints to judge."""
+    groups = pd.Series(None, index=work.index, dtype=object)
+    judged = pd.Series(False, index=work.index)
+    if 'version' not in work.columns:
+        return groups, judged
+    keys = work['version'].map(_version_key)
+    if 'platform' in work.columns:
+        platforms = work['platform'].fillna('')
+    else:
+        platforms = pd.Series('', index=work.index)
+    for platform in platforms.unique():
+        mask = (platforms == platform) & keys.notna()
+        if not mask.any():
+            continue
+        latest = max(keys[mask])
+        on_latest = mask & keys.map(lambda k: k == latest)
+        groups[on_latest] = 'latest'
+        groups[mask & ~on_latest] = 'older'
+        if on_latest.sum() >= PRIORITY_VERSION_MIN_COMPLAINTS:
+            judged[platforms == platform] = True
+    return groups, judged
+
+
+def _version_factor(latest_any, latest, older, latest_total, older_total):
+    """Priority multiplier and status for one theme.
+
+    latest_any counts the theme's complaints on any platform's latest version;
+    the rest are limited to platforms with enough data to judge."""
+    if latest_total == 0 or older_total == 0:
+        return 1.0, None
+    if latest_any == 0 and older > 0:
+        return PRIORITY_FIXED_FACTOR, 'likely_fixed'
+    if latest == 0:
+        return 1.0, None
+    if older == 0:
+        return PRIORITY_MAX_BOOST, 'new'
+    ratio = (latest / latest_total) / (older / older_total)
+    if ratio >= PRIORITY_RISING_RATIO:
+        return min(ratio, PRIORITY_MAX_BOOST), 'rising'
+    return 1.0, None
+
+
 def categorize_complaints(df, lang_code='en'):
     """Group complaints into themes by keyword match.
 
@@ -662,9 +733,13 @@ def categorize_complaints(df, lang_code='en'):
         likes = {theme: 0 for theme in theme_keywords}
         score_sums = {theme: 0.0 for theme in theme_keywords}
         weighted = {theme: 0.0 for theme in theme_keywords}
+        on_latest_any = {theme: 0 for theme in theme_keywords}
+        on_latest = {theme: 0 for theme in theme_keywords}
+        on_older = {theme: 0 for theme in theme_keywords}
 
         work = df.dropna(subset=['review']).copy()
         work['recency'] = _recency_weights(work)
+        work['ver_group'], work['ver_judged'] = _version_groups(work)
         # itertuples renames columns starting with an underscore to positional
         # names, so use a plain one
         work['text_lower'] = work['review'].astype(str).str.lower()
@@ -683,23 +758,36 @@ def categorize_complaints(df, lang_code='en'):
                 if any(kw in text for kw in keywords):
                     counts[theme] += 1
                     likes[theme] += row_likes
-                    weighted[theme] += (1 + row_likes) * row.recency
+                    # Likes on a log scale: endorsement matters, but one viral
+                    # review must not outweigh a fresh wave of complaints
+                    weighted[theme] += (1 + math.log1p(row_likes)) * row.recency
+                    if row.ver_group == 'latest':
+                        on_latest_any[theme] += 1
+                        on_latest[theme] += row.ver_judged
+                    elif row.ver_group == 'older':
+                        on_older[theme] += row.ver_judged
                     if row_score is not None and not pd.isna(row_score):
                         score_sums[theme] += float(row_score)
 
         total = len(work) or 1
+        latest_total = int(((work['ver_group'] == 'latest') & work['ver_judged']).sum())
+        older_total = int(((work['ver_group'] == 'older') & work['ver_judged']).sum())
         themes = []
         for theme, cnt in counts.items():
             if cnt == 0:
                 continue
             avg_score = round(score_sums[theme] / cnt, 2) if has_score and score_sums[theme] else None
-            # priority = affected users x severity
+            # priority = affected users x severity x version factor
             #   affected = complaints + likes (a like is another "me too")
             #   severity = 5 - average rating (lower rating, worse problem)
-            # The score uses the recency-weighted affected count; the table
-            # still shows the raw one.
+            # The score uses the recency-weighted affected count, with likes on
+            # a log scale, times the version factor; the table still shows the
+            # raw count.
             affected = cnt + likes[theme]
             severity = (5 - avg_score) if avg_score is not None else 3.0
+            factor, version_status = _version_factor(
+                on_latest_any[theme], on_latest[theme], on_older[theme],
+                latest_total, older_total)
             themes.append({
                 'theme': theme,
                 'count': cnt,
@@ -707,7 +795,8 @@ def categorize_complaints(df, lang_code='en'):
                 'likes': likes[theme],
                 'avg_score': avg_score,
                 'affected': affected,
-                'priority_raw': round(weighted[theme] * severity, 2),
+                'version_status': version_status,
+                'priority_raw': round(weighted[theme] * severity * factor, 2),
             })
 
         # Normalise to 0-100 against the top theme, for display

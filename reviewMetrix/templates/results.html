@@ -1173,6 +1173,26 @@
             letter-spacing: 0.05em;
         }
 
+        .version-badge {
+            font-size: 0.6rem;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 4px;
+            letter-spacing: 0.05em;
+            margin-left: 6px;
+            white-space: nowrap;
+        }
+
+        .version-badge-rising {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--red);
+        }
+
+        .version-badge-fixed {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--green);
+        }
+
         .trending-meta {
             display: flex;
             flex-direction: column;
@@ -1660,7 +1680,7 @@
         <div class="grid-card full-width-card" style="margin-bottom: 30px;">
             <h3><span class="h3-label">🔧 Fix First — Prioritized Issues <span class="tip" data-tip="Themes ranked by (complaints + likes) times severity, not raw count. A few harsh, highly-liked complaints outrank many mild ones." tabindex="0" role="button" aria-label="Themes ranked by (complaints + likes) times severity, not raw count. A few harsh, highly-liked complaints outrank many mild ones.">?</span></span>
                 <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">
-                    priority = (complaints + likes) × severity × recency
+                    priority = (complaints + log likes) × severity × recency × version
                 </span>
             </h3>
             <div class="priority-table-wrapper">
@@ -1678,7 +1698,12 @@
                     <tbody>
                         {% for t in themes %}
                         <tr>
-                            <td style="font-weight: 600;">{{ t.theme }}</td>
+                            <td style="font-weight: 600;">{{ t.theme }}
+                                {% if t.version_status == 'new' %}<span class="version-badge version-badge-rising" title="Only seen on the latest app version">NEW IN LATEST</span>
+                                {% elif t.version_status == 'rising' %}<span class="version-badge version-badge-rising" title="A larger share of complaints on the latest app version than on older ones">RISING</span>
+                                {% elif t.version_status == 'likely_fixed' %}<span class="version-badge version-badge-fixed" title="No complaints on the latest app version">LIKELY FIXED</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 <span class="priority-bar" style="width: {{ (t.priority * 0.6)|round|int }}px;"></span>
                                 <strong style="font-family: 'Outfit', sans-serif;">{{ t.priority }}</strong>
@@ -1701,6 +1726,9 @@
                 lower average ratings weigh more. A theme with few complaints but many likes can outrank a more
                 frequent but milder one. Newer complaints weigh more: a complaint's weight halves every
                 {{ '%g'|format(priority_half_life_days) }} days before the newest review, so an already-fixed bug fades out of the ranking.
+                Likes count on a log scale, so one viral review cannot bury a new wave of complaints. Each theme is also
+                compared across app versions: one with no complaints on the latest version is marked likely fixed and drops,
+                and one that grew on it is boosted.
                 {% if not (themes | selectattr('likes') | list) %}
                 <br><em>Likes are only available for Google Play reviews.</em>
                 {% endif %}
