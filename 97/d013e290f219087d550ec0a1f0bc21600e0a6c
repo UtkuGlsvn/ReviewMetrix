@@ -1,0 +1,31 @@
+README.md
+  s_208115731dc080::t_bddf94a23a8e10 34,288
+reviewMetrix/routes.py
+  s_208115731dc080::t_d1be0adbecef13 141
+reviewMetrix/analyzer.py
+  s_208115731dc080::t_91168638ae2118 500
+  s_208115731dc080::t_d1be0adbecef13 432-499,501-546,1586-1587,1622
+tests/test_rating_timeline.py
+  s_208115731dc080::t_7e95e8a87f7709 1-123
+reviewMetrix/templates/results.html
+  s_208115731dc080::t_bddf94a23a8e10 2422,2452
+  s_208115731dc080::t_683730831e9da3 1659,2360-2361,2363-2378,2425-2427,2432-2437,2453
+  s_208115731dc080::t_3bff6b23334418 569-654,1654-1658,1660-1685,2350-2359,2362,2379-2421,2423-2424,2428-2431,2438-2451,2454-2480
+  s_208115731dc080::t_fa3beb1ff04b2b 2481
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "97d013e290f219087d550ec0a1f0bc21600e0a6c",
+  "prompts": {},
+  "sessions": {
+    "s_208115731dc080": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c9b1965-9170-40db-87bf-1b60547133f7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "utku glsvn <utku.glsvn@gmail.com>"
+    }
+  }
+}
