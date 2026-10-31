@@ -462,17 +462,18 @@ def _release_days(df):
     return releases
 
 
-def get_rating_timeline(df, windows=RATING_TIMELINE_WINDOWS):
+def get_rating_timeline(df, windows=RATING_TIMELINE_WINDOWS, today=None):
     """Daily average star rating per platform, in the style of the Play
     Console's Average rating card.
 
     For every platform (plus 'All') and window length it returns the per-day
     average (None on days without reviews, so the line breaks there), the
     window's average, the change against the window before it, and the days a
-    new app version first appeared. Windows end on the newest review.
+    new app version first appeared. Windows end today (UTC, like the review
+    dates), so a quiet spell since the newest review shows up as a gap.
     """
     result = {'available': False, 'platforms': [], 'windows': list(windows),
-              'end_date': None, 'series': {}}
+              'end_date': None, 'last_review_date': None, 'series': {}}
     if df is None or df.empty or 'score' not in df.columns or 'date' not in df.columns:
         return result
     try:
@@ -483,8 +484,13 @@ def get_rating_timeline(df, windows=RATING_TIMELINE_WINDOWS):
         if work.empty:
             return result
 
-        end = work['day'].max()
+        newest = work['day'].max()
+        if today is None:
+            today = pd.Timestamp.now(tz='UTC').tz_localize(None)
+        # A review stamped after "today" (clock skew) still lands in the window
+        end = max(pd.Timestamp(today).normalize(), newest)
         result['end_date'] = end.strftime('%Y-%m-%d')
+        result['last_review_date'] = newest.strftime('%Y-%m-%d')
 
         groups = [('All', work)]
         if 'platform' in work.columns:
@@ -1584,7 +1590,7 @@ def build_app_report(google_id, apple_name, country, language, max_reviews,
                 'reviews_analyzed': 0, 'available': False},
         'momentum': {'platforms': [], 'available': False},
         'rating_timeline': {'available': False, 'platforms': [], 'windows': [],
-                            'end_date': None, 'series': {}},
+                            'end_date': None, 'last_review_date': None, 'series': {}},
         'responses': {'available': False, 'total': 0, 'replied': 0, 'response_rate': 0.0,
                       'complaints_total': 0, 'complaints_replied': 0,
                       'complaint_response_rate': 0.0, 'median_hours': None, 'by_theme': []},

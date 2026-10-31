@@ -20,10 +20,16 @@ def _df(rows):
 GP, IOS = 'Google Play', 'App Store'
 
 
+def _timeline(df, **kwargs):
+    """Pencereyi en yeni review gunune sabitler, testler takvimden bagimsiz kalsin."""
+    kwargs.setdefault('today', df['date'].max())
+    return analyzer.get_rating_timeline(df, **kwargs)
+
+
 def test_daily_average_with_gaps_on_days_without_reviews():
     df = _df([('2024-03-01 09:00', 5, '1.0', GP), ('2024-03-01 18:00', 3, '1.0', GP),
               ('2024-03-04 10:00', 2, '1.0', GP)])
-    w = analyzer.get_rating_timeline(df, windows=(7,))['series'][GP]['7']
+    w = _timeline(df, windows=(7,))['series'][GP]['7']
 
     assert w['days'][0] == '2024-02-27' and w['days'][-1] == '2024-03-04'
     assert w['avg'] == [None, None, None, 4.0, None, None, 2.0]
@@ -32,7 +38,7 @@ def test_daily_average_with_gaps_on_days_without_reviews():
 
 def test_window_average_is_weighted_by_reviews_not_days():
     df = _df([('2024-03-01', 5, '1.0', GP)] * 3 + [('2024-03-02', 1, '1.0', GP)])
-    w = analyzer.get_rating_timeline(df, windows=(7,))['series'][GP]['7']
+    w = _timeline(df, windows=(7,))['series'][GP]['7']
     assert w['average'] == 4.0       # (5+5+5+1)/4, gunlerin ortalamasi olsa 3.0 olurdu
     assert w['reviews'] == 4
 
@@ -40,7 +46,7 @@ def test_window_average_is_weighted_by_reviews_not_days():
 def test_delta_against_previous_period():
     df = _df([('2024-03-01', 5, '1.0', GP), ('2024-03-02', 4, '1.0', GP),   # onceki 7 gun
               ('2024-03-09', 3, '1.0', GP), ('2024-03-14', 4, '1.0', GP)])  # son 7 gun
-    w = analyzer.get_rating_timeline(df, windows=(7,))['series'][GP]['7']
+    w = _timeline(df, windows=(7,))['series'][GP]['7']
 
     assert w['previous_average'] == 4.5
     assert w['average'] == 3.5
@@ -49,13 +55,13 @@ def test_delta_against_previous_period():
 
 def test_delta_is_none_without_previous_reviews():
     df = _df([('2024-03-10', 4, '1.0', GP)])
-    w = analyzer.get_rating_timeline(df, windows=(7,))['series'][GP]['7']
+    w = _timeline(df, windows=(7,))['series'][GP]['7']
     assert w['delta'] is None and w['previous_average'] is None
 
 
 def test_platforms_are_split_and_all_combines_them():
     df = _df([('2024-03-10', 5, '1.0', GP), ('2024-03-10', 1, '2.0', IOS)])
-    r = analyzer.get_rating_timeline(df, windows=(7,))
+    r = _timeline(df, windows=(7,))
 
     assert r['platforms'] == ['All', GP, IOS]
     assert r['series'][GP]['7']['average'] == 5.0
@@ -65,7 +71,7 @@ def test_platforms_are_split_and_all_combines_them():
 
 def test_single_platform_has_no_all_series():
     df = _df([('2024-03-10', 5, '1.0', GP)])
-    assert analyzer.get_rating_timeline(df)['platforms'] == [GP]
+    assert _timeline(df)['platforms'] == [GP]
 
 
 def test_releases_mark_first_day_of_each_newer_version():
@@ -73,7 +79,7 @@ def test_releases_mark_first_day_of_each_newer_version():
               ('2024-03-05', 4, '1.1', GP),
               ('2024-03-06', 4, '1.0', GP),     # eski surumde kalan kullanici: release degil
               ('2024-03-08', 4, '1.10', GP)])   # 1.10 > 1.9 sayisal siralama
-    w = analyzer.get_rating_timeline(df, windows=(30,))['series'][GP]['30']
+    w = _timeline(df, windows=(30,))['series'][GP]['30']
 
     assert [(r['date'], r['version']) for r in w['releases']] == \
         [('2024-03-05', '1.1'), ('2024-03-08', '1.10')]
@@ -82,7 +88,7 @@ def test_releases_mark_first_day_of_each_newer_version():
 def test_releases_are_per_platform_and_labelled_in_all():
     df = _df([('2024-03-01', 4, '9.0', GP), ('2024-03-01', 4, '2.0', IOS),
               ('2024-03-04', 4, '2.1', IOS)])
-    r = analyzer.get_rating_timeline(df, windows=(7,))
+    r = _timeline(df, windows=(7,))
 
     assert r['series'][GP]['7']['releases'] == []
     assert r['series']['All']['7']['releases'] == \
@@ -92,16 +98,43 @@ def test_releases_are_per_platform_and_labelled_in_all():
 def test_releases_outside_window_are_dropped():
     df = _df([('2024-01-01', 4, '1.0', GP), ('2024-01-02', 4, '1.1', GP),
               ('2024-03-01', 4, '1.1', GP)])
-    r = analyzer.get_rating_timeline(df, windows=(7, 90))
+    r = _timeline(df, windows=(7, 90))
     assert r['series'][GP]['7']['releases'] == []
     assert len(r['series'][GP]['90']['releases']) == 1
 
 
 def test_works_without_version_or_platform_columns():
     df = pd.DataFrame({'score': [4, 2], 'date': pd.to_datetime(['2024-03-01', '2024-03-02'])})
-    r = analyzer.get_rating_timeline(df, windows=(7,))
+    r = _timeline(df, windows=(7,))
     assert r['available'] is True
     assert r['series'][r['platforms'][0]]['7']['average'] == 3.0
+
+
+def test_windows_end_today_not_on_newest_review():
+    df = _df([('2024-03-01', 4, '1.0', GP), ('2024-03-08', 2, '1.0', GP)])
+    r = analyzer.get_rating_timeline(df, windows=(7, 30), today=pd.Timestamp('2024-03-20 15:30'))
+    w7, w30 = r['series'][GP]['7'], r['series'][GP]['30']
+
+    assert r['end_date'] == '2024-03-20' and r['last_review_date'] == '2024-03-08'
+    assert w7['days'][-1] == '2024-03-20'
+    assert w7['average'] is None and w7['reviews'] == 0 and w7['delta'] is None
+    assert w7['previous_average'] == 2.0          # 2024-03-07..13 araligi
+    assert w30['average'] == 3.0 and w30['reviews'] == 2
+
+
+def test_review_after_today_still_lands_in_window():
+    df = _df([('2024-03-21 01:00', 5, '1.0', GP)])
+    r = analyzer.get_rating_timeline(df, windows=(7,), today=pd.Timestamp('2024-03-20'))
+    assert r['end_date'] == '2024-03-21'
+    assert r['series'][GP]['7']['average'] == 5.0
+
+
+def test_defaults_to_current_date():
+    today = pd.Timestamp.now(tz='UTC').tz_localize(None).normalize()
+    df = _df([(today - pd.Timedelta(days=40), 4, '1.0', GP)])
+    r = analyzer.get_rating_timeline(df, windows=(30,))
+    assert r['end_date'] == today.strftime('%Y-%m-%d')
+    assert r['series'][GP]['30']['reviews'] == 0
 
 
 @pytest.mark.parametrize('df', [None, pd.DataFrame(), pd.DataFrame({'score': [4]})])
