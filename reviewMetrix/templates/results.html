@@ -2396,7 +2396,9 @@
                 if (data.delta === null) {
                     box.classList.add('is-flat');
                     icon.textContent = '–';
-                    text.textContent = 'no reviews in the previous ' + state.window + ' days';
+                    text.textContent = data.average === null
+                        ? 'no reviews in the last ' + state.window + ' days'
+                        : 'no reviews in the previous ' + state.window + ' days';
                 } else {
                     const cls = data.delta < 0 ? 'is-down' : data.delta > 0 ? 'is-up' : 'is-flat';
                     box.classList.add(cls);
@@ -2408,6 +2410,9 @@
                     (data.previous_average !== null
                         ? ' · previous ' + state.window + ' days: ' + data.previous_average.toFixed(2) +
                           ' from ' + data.previous_reviews + ' reviews'
+                        : '') +
+                    (timeline.last_review_date !== timeline.end_date
+                        ? ' · newest review: ' + timeline.last_review_date
                         : '');
             }
 
